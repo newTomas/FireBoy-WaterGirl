@@ -11,7 +11,7 @@ type
     function IndexOf(name: string):Word;
     function Load(name: string; ListBox: TListBox=nil): boolean;
     function LoadPNG(Handle: THandle):TPngImage;
-    function LoadALL(name: string; ListBox: TListBox=nil; list: TList=nil): boolean;
+    function LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
     function UnLoad(name: string; ListBox: TListBox=nil): boolean;
     procedure UnLoadAll(ListBox: TListBox=nil);
     function GetHandle(Index: Word):THandle;
@@ -100,7 +100,7 @@ Begin
   result.LoadFromResourceName(Handle, 'pic');
 End;
 
-function TDLLManager.LoadALL(name: string; ListBox: TListBox=nil; list: TList=nil): boolean;
+function TDLLManager.LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
 var
   sr: TSearchRec;
   SL: TStringList;
@@ -110,7 +110,10 @@ Begin
       SL := TStringList.Create;
       SL.Delimiter := '.';
       SL.DelimitedText := sr.Name;
-      if Load(name + '\' + sr.Name, ListBox) and (list <> nil) then list.Add(LoadPNG(Libs[High(Libs)].Handle));
+      if Load(name + '\' + sr.Name, ListBox) and (myobj <> nil) then
+      Begin
+        myobj.Add(LoadPNG(Libs[High(Libs)].Handle), SL[0]);
+      End;
     until FindNext(sr) <> 0;
   FindClose(sr);
   result := true;
