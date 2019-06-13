@@ -137,6 +137,14 @@ implementation
 
 {$R *.dfm}
 
+function Inside(Obj: Word):boolean;
+Begin
+  if (players[0].Left <= obj[i].img.Left+obj[i].img.Width)
+  and (obj[i].img.Left <= players[0].Left+players[0].img.Width)
+  and (players[0].Top <= obj[i].img.Top+obj[i].img.Height)
+  and (obj[i].img.Top <= players[0].Top+players[0].img.Height) then result := true;
+End;
+
 procedure Activate;
 var
   i: Word;
@@ -573,7 +581,7 @@ begin
     return.Visible := false;
     return.Left := list.Left + list.Width div 2 - return.Width div 2;
     return.Top := list.Top + list.Height + 6;
-    return.Caption := 'Âåðíóòüñÿ';
+    return.Caption := 'Ð’ÐµÑ€Ð½ÑƒÑ‚ÑŒÑÑ';
     return.OnClick := OnClick;
   End;
 
@@ -641,7 +649,7 @@ begin
     Btn1 := TBitBtn.Create(Form1);
     Btn1.Parent := Form1;
     Btn1.Tag := 1;
-    Btn1.Caption := 'ÈÃÐÀÒÜ';
+    Btn1.Caption := 'Ð˜Ð“Ð ÐÐ¢Ð¬';
     items[Btn1.Tag].left :=390;
     items[Btn1.Tag].top := 280;
     items[Btn1.Tag].width := 500;
@@ -654,7 +662,7 @@ begin
     Btn2 := TBitBtn.Create(Form1);
     Btn2.Parent := Form1;
     Btn2.Tag := 2;
-    Btn2.Caption := 'ÑÎÇÄÀÒÜ ÑÅÐÂÅÐ';
+    Btn2.Caption := 'Ð¡ÐžÐ—Ð”ÐÐ¢Ð¬ Ð¡Ð•Ð Ð’Ð•Ð ';
     items[Btn2.Tag].left := 390;
     items[Btn2.Tag].top := 400;
     items[Btn2.Tag].width := 500;
@@ -667,7 +675,7 @@ begin
     Btn3 := TBitBtn.Create(Form1);
     Btn3.Parent := Form1;
     Btn3.Tag := 3;
-    Btn3.Caption := 'ÌÎÄÛ';
+    Btn3.Caption := 'ÐœÐžÐ”Ð«';
     items[Btn3.Tag].left := 390;
     items[Btn3.Tag].top := 466;
     items[Btn3.Tag].width := 500;
@@ -680,7 +688,7 @@ begin
     Btn4 := TBitBtn.Create(Form1);
     Btn4.Parent := Form1;
     Btn4.Tag := 4;
-    Btn4.Caption := 'ÍÀÑÒÐÎÉÊÈ';
+    Btn4.Caption := 'ÐÐÐ¡Ð¢Ð ÐžÐ™ÐšÐ˜';
     items[Btn4.Tag].left := 390;
     items[Btn4.Tag].top := 532;
     items[Btn4.Tag].width := 500;
@@ -693,7 +701,7 @@ begin
     Btn5 := TBitBtn.Create(Form1);
     Btn5.Parent := Form1;
     Btn5.Tag := 5;
-    Btn5.Caption := 'ÂÛÕÎÄ';
+    Btn5.Caption := 'Ð’Ð«Ð¥ÐžÐ”';
     items[Btn5.Tag].left := 390;
     items[Btn5.Tag].top := 598;
     items[Btn5.Tag].width := 500;
@@ -751,7 +759,7 @@ begin
     ReturnBtn.Anchors := [akLeft,akTop,akRight,akBottom];
     ReturnBtn.Font.Size := 6;
     items[ReturnBtn.Tag].font := ReturnBtn.Font.Size;
-    ReturnBtn.Caption := 'ÂÅÐÍÓÒÜÑß';
+    ReturnBtn.Caption := 'Ð’Ð•Ð ÐÐ£Ð¢Ð¬Ð¡Ð¯';
     ReturnBtn.OnClick := OnClick;
     ReturnBtn.Visible := false;
 
@@ -769,7 +777,7 @@ begin
     GetInfoBtn.Anchors := [akLeft,akTop,akRight,akBottom];
     GetInfoBtn.Font.Size := 6;
     items[GetInfoBtn.Tag].font := GetInfoBtn.Font.Size;
-    GetInfoBtn.Caption := 'ÈÍÔÎÐÌÀÖÈß';
+    GetInfoBtn.Caption := 'Ð˜ÐÐ¤ÐžÐ ÐœÐÐ¦Ð˜Ð¯';
     GetInfoBtn.OnClick := OnClick;
     GetInfoBtn.Visible := false;
 
@@ -787,7 +795,7 @@ begin
     ConnectBtn.Anchors := [akLeft,akTop,akRight,akBottom];
     ConnectBtn.Font.Size := 6;
     items[ConnectBtn.Tag].font := ConnectBtn.Font.Size;
-    ConnectBtn.Caption := 'ÏÎÄÊËÞ×ÈÒÜÑß';
+    ConnectBtn.Caption := 'ÐŸÐžÐ”ÐšÐ›Ð®Ð§Ð˜Ð¢Ð¬Ð¡Ð¯';
     ConnectBtn.OnClick := OnClick;
     ConnectBtn.Visible := false;
   End;
@@ -829,7 +837,7 @@ begin
     items[ReadyCheckbox.Tag].top := 606;
     items[ReadyCheckbox.Tag].width := ReadyCheckbox.Width;
     items[ReadyCheckbox.Tag].height := ReadyCheckbox.Height;
-    ReadyCheckbox.Caption := 'Ãîòîâ';
+    ReadyCheckbox.Caption := 'Ð“Ð¾Ñ‚Ð¾Ð²';
     ReadyCheckbox.Align := alCustom;
     ReadyCheckbox.Anchors := [akLeft,akTop,akRight,akBottom];
     ReadyCheckbox.Font.Size := 12;
@@ -843,7 +851,7 @@ begin
     items[FireBoyChoice.Tag].top := 606;
     items[FireBoyChoice.Tag].width := ReadyCheckbox.Width;
     items[FireBoyChoice.Tag].height := ReadyCheckbox.Height;
-    FireBoyChoice.Caption := 'Îãîíü';
+    FireBoyChoice.Caption := 'ÐžÐ³Ð¾Ð½ÑŒ';
     FireBoyChoice.Align := alCustom;
     FireBoyChoice.Anchors := [akLeft,akTop,akRight,akBottom];
     FireBoyChoice.Font.Size := 12;
@@ -857,7 +865,7 @@ begin
     items[WaterGirlChoice.Tag].top := 606;
     items[WaterGirlChoice.Tag].width := ReadyCheckbox.Width;
     items[WaterGirlChoice.Tag].height := ReadyCheckbox.Height;
-    WaterGirlChoice.Caption := 'Âîäà';
+    WaterGirlChoice.Caption := 'Ð’Ð¾Ð´Ð°';
     WaterGirlChoice.Align := alCustom;
     WaterGirlChoice.Anchors := [akLeft,akTop,akRight,akBottom];
     WaterGirlChoice.Font.Size := 12;
@@ -871,7 +879,7 @@ begin
     items[Exchange.Tag].top := 606;
     items[Exchange.Tag].width := ReadyCheckbox.Width;
     items[Exchange.Tag].height := ReadyCheckbox.Height;
-    Exchange.Caption := 'Âîäà';
+    Exchange.Caption := 'Ð’Ð¾Ð´Ð°';
     Exchange.Align := alCustom;
     Exchange.Anchors := [akLeft,akTop,akRight,akBottom];
     Exchange.Font.Size := 12;

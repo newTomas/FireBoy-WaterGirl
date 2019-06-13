@@ -39,6 +39,7 @@ var
   end;
   players: array of record
     nick: string;
+    choice: string;
     ready: boolean;
   end;
 
@@ -100,7 +101,8 @@ var
 Begin
   if list.Count = 0 then exit;
   for i := 0 to list.Count-1 do
-    if list.Items[i] <> @AContext then TIdContext(list.Items[i]).Connection.Socket.WriteLn(msg);
+    if @TIdContext(list.Items[i]).Connection.Socket <> @AContext.Connection.Socket then
+      TIdContext(list.Items[i]).Connection.Socket.WriteLn(msg);
 End;
 
 procedure SendAll(msg: string);
@@ -144,7 +146,7 @@ var
   readys: Byte;
 begin
   s := AContext.Connection.Socket.ReadLn;
-  ShowMessage(s);
+  //ShowMessage(s);
   if s = 'Ready' then
   Begin      
     readys := 0;
@@ -153,17 +155,41 @@ begin
     for i := 0 to High(players) do if players[i].ready then inc(readys);
     if readys = settings.maxplayers then SendAll('start');
     exit;
-  End;
+  End else
   if s = 'NotReady' then
+  Begin
+    if IndexOf(@AContext.Connection.Socket) <> -1 then
+      players[IndexOf(@AContext.Connection.Socket)].ready := false;
+    exit;
+  End else
+  if s = 'FireChosen' then
   Begin
     readys := 0;
     if IndexOf(@AContext.Connection.Socket) = -1 then exit;
-    players[IndexOf(@AContext.Connection.Socket)].ready := false;
-  End;
-  s1 := TStringList.Create;
+    players[IndexOf(@AContext.Connection.Socket)].choice := 'Fire';
+    SendAll('FireChosen');
+    exit;
+  End else
+  if s = 'WaterChosen' then
+  Begin
+    readys := 0;
+    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
+    players[IndexOf(@AContext.Connection.Socket)].choice := 'Water';
+    SendAll('WaterChosen');
+    exit;
+  End else
+  if s = 'NotChosen' then
+  Begin
+    readys := 0;
+    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
+    players[IndexOf(@AContext.Connection.Socket)].choice := '';
+    SendAll('NotChosen');
+    exit;
+  End else SendAllBut(AContext, s);
+  {s1 := TStringList.Create;
   s1.Delimiter := '|';
   s1.StrictDelimiter := true;
-  s1.DelimitedText := s;
+  s1.DelimitedText := s; }
 end;
 
 end.

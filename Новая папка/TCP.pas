@@ -5,7 +5,7 @@ interface
   IdComponent, IdTCPConnection, TypInfo, Controls, SysUtils, TFNW;
 
 type
-  TonMsg = Procedure(s: string);
+  //TonMsg = Procedure(s: string);
   TCPClient = class
     private
       function FReadConnected: Boolean;
@@ -14,24 +14,25 @@ type
     function Connect(IP: String; Port: Word; hashes: TMapsList): TPing;
     function Ping(IP: String; Port: Word): TPing;
     procedure Send(Msg: String);
+    function Read: string;
     procedure IdTCPClientConnected(Sender: TObject);
     procedure IdTCPClientDisconnected(Sender: TObject);
     procedure Disconnect;
-    constructor create(onMsgProcedure: TonMsg);
+    constructor create{(onMsgProcedure: TonMsg)};
   private
   end;
-  TCPsock = class(TThread)
+  {TCPsock = class(TThread)
   private
-    { Private declarations }
+    //
   protected
     procedure Execute; override;
-  end;
+  end; }
 
 var
   IdTCPClient: TIdTCPClient;
   pinging: boolean;
-  onMsg: TonMsg;
-  cl: TCPsock;
+  //onMsg: TonMsg;
+  //cl: TCPsock;
   Client: TCPClient;
   s: String;
 
@@ -39,12 +40,12 @@ implementation
 
 procedure TCPClient.IdTCPClientConnected(Sender: TObject);
 begin
-  cl := TCPsock.Create(false);
+  //cl := TCPsock.Create(false);
 end;
 
 procedure TCPClient.IdTCPClientDisconnected(Sender: TObject);
 begin
-  cl.Free;
+  //cl.Free;
 end;
 
 function TCPClient.Ping(IP: String; Port: Word): TPing;
@@ -83,6 +84,11 @@ begin
   IdTCPClient.Socket.WriteLn(Msg);
 end;
 
+function TCPClient.Read: string;
+Begin
+  result := IdTCPClient.Socket.ReadLn;
+End;
+
 function TCPClient.Connect(IP: string; Port: Word; hashes: TMapsList): TPing;
 var
   s: TStringList;
@@ -111,10 +117,10 @@ begin
     if result.hash = '' then
     Begin
       IdTCPClient.Socket.WriteLn('download');
-      FS := TFileStream.Create('map/'+result.map+'.dat', fmOpenWrite);
+      FS := TFileStream.Create('maps/'+result.map+'.dat', fmOpenWrite);
       IdTCPClient.Socket.ReadStream(FS);
       FS.Free;
-      FS := TFileStream.Create('map/'+result.map+'.dat.settings', fmOpenWrite);
+      FS := TFileStream.Create('maps/'+result.map+'.dat.settings', fmOpenWrite);
       IdTCPClient.Socket.ReadStream(FS);
       FS.Free;
     End else IdTCPClient.Socket.WriteLn('downloaded');
@@ -131,20 +137,20 @@ begin
   pinging := false;
 end;
 
-procedure TCPsock.Execute;
+{procedure TCPsock.Execute;
 begin
-  repeat    
+  repeat
     if pinging then Continue;
     onMsg(IdTCPClient.Socket.ReadLn);
   until (Terminated);
-end;
+end;            }
 
-constructor TCPClient.create(onMsgProcedure: TonMsg);
+constructor TCPClient.create{(onMsgProcedure: TonMsg)};
 begin
   IdTCPClient := TIdTCPClient.Create(Nil);
   IdTCPClient.OnConnected := IdTCPClientConnected;
   IdTCPClient.OnDisconnected := IdTCPClientDisconnected;
-  onMsg := onMsgProcedure;
+  //onMsg := onMsgProcedure;
 end;
 
 procedure TCPClient.Disconnect;

@@ -2,7 +2,7 @@ unit TFNW;
 
 interface
 
-uses Jpeg, Graphics, Windows, ExtCtrls, GIFImg, Classes, Math, Controls, Dialogs, SysUtils, IdContext,
+uses Vcl.Imaging.Jpeg, Graphics, Windows, ExtCtrls, Vcl.Imaging.GIFImg, Classes, Math, Controls, Dialogs, SysUtils, IdContext,
 IdHashMessageDigest, idHash;
 
 type
@@ -95,11 +95,6 @@ function RoundUp(Value, N: Integer): Integer;
 function MD5(const fileName : string) : string;
 
 implementation
-
-function Distance(a,b: Tpos): Word;
-Begin
-  result := Round(sqrt(sqr(b.x-a.x)+sqr(b.y-a.y)));
-End;
 
 function MD5(const fileName : string) : string;
  var

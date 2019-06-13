@@ -2,7 +2,7 @@ unit TFNW;
 
 interface
 
-uses Jpeg, Graphics, Windows, ExtCtrls, GIFImg, Classes, Math, Controls, Dialogs, SysUtils, IdContext,
+uses Vcl.Imaging.Jpeg, Vcl.Graphics, Windows, Vcl.ExtCtrls, Vcl.Imaging.GIFImg, Classes, Math, Vcl.Controls, Vcl.Dialogs, SysUtils, IdContext,
 IdHashMessageDigest, idHash;
 
 type
@@ -11,7 +11,7 @@ type
     img: TImage;
     width, height: Word;
     name: string[32];
-    activate: Word; // Какой объект активирует
+    activate: Word; // РљР°РєРѕР№ РѕР±СЉРµРєС‚ Р°РєС‚РёРІРёСЂСѓРµС‚
   end;
   PGetActivatedObject = ^TGetActivatedObject;
   TGetActivatedObject = function(id: Byte): PMapObject;
@@ -53,7 +53,7 @@ type
     x, y: Word;
     width, height: Word;
     name: string[32];
-    activate: Word; //Какой объект активирует
+    activate: Word; //РљР°РєРѕР№ РѕР±СЉРµРєС‚ Р°РєС‚РёРІРёСЂСѓРµС‚
   end;
   TAnim = class
     private
@@ -95,11 +95,6 @@ function RoundUp(Value, N: Integer): Integer;
 function MD5(const fileName : string) : string;
 
 implementation
-
-function Distance(a,b: Tpos): Word;
-Begin
-  result := Round(sqrt(sqr(b.x-a.x)+sqr(b.y-a.y)));
-End;
 
 function MD5(const fileName : string) : string;
  var

@@ -9,14 +9,14 @@ uses
 type
   TDLLManager = class
     function IndexOf(name: string):Word;
-    function Load(name: string; ListBox: TListBox=nil): boolean;
+    function Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
     function LoadJPEG(Handle: THandle):TJPEGImage;
     function LoadGIF(Handle: THandle):TGIFImage;
-    function LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
+    function LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
     function UnLoad(name: string; ListBox: TListBox=nil): boolean;
     procedure UnLoadAll(ListBox: TListBox=nil);
     function GetHandle(Index: Word):THandle;
-    function Run(name: string; on: string; blockpos: Tpos; playerpos: Tpos; side: byte=0; Dist: Word=0): boolean;
+    function Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte): boolean;
   private
 
   public
@@ -28,11 +28,12 @@ var
     name: string;
     Handle: THandle;
     functions: record
-      Init: function: Pointer;
-      onAbove: procedure(side: byte; blockpos: Tpos; playerpos: Tpos);
-      onBelow: procedure(side: byte; blockpos: Tpos; playerpos: Tpos);
-      onDistance: procedure(Dist: Word; blockpos: Tpos; playerpos: Tpos);
-      onInside: procedure(blockpos: Tpos; playerpos: Tpos);
+      Init: function(GetActivatedObject, PlayerKill, Win: Pointer): Pointer;
+      onAbove: procedure(ObjectId,ActivatedId,PlayerType: Byte);
+      onBelow: procedure(ObjectId,ActivatedId,PlayerType: Byte);
+      onDistance: procedure(Dist: Word; ObjectId,ActivatedId,PlayerType: Byte);
+      onInside: procedure(ObjectId,ActivatedId,PlayerType: Byte);
+      onActivate: procedure(ObjectId,ActivatedId,PlayerType: Byte);
     end;
     settings: ^TSettings;
   end;
@@ -51,7 +52,7 @@ Begin
   end;
 End;
 
-function TDLLManager.Load(name: string; ListBox: TListBox=nil): boolean;
+function TDLLManager.Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
 var
   wideChars: PWideChar;
 Begin
@@ -81,7 +82,7 @@ Begin
     @Libs[High(Libs)].functions.Init := GetProcAddress(Libs[High(Libs)].Handle,'Init');
 
     if @Libs[High(Libs)].functions.Init <> nil then
-      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init;
+      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init(GetActivatedObject, PlayerKill, Win);
 
     if Libs[High(Libs)].settings.onDistance then
       @Libs[High(Libs)].functions.onDistance := GetProcAddress(Libs[High(Libs)].Handle,'onDistance');
@@ -120,21 +121,23 @@ Begin
   End;
 End;
 
-function TDLLManager.Run(name: string; on: string; blockpos: Tpos; playerpos: Tpos; side: byte=0; Dist: Word=0): boolean;
+function TDLLManager.Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte): boolean;
 begin
   result := true;
   if (on = 'Distance') and (Libs[IndexOf(name)].settings.onDistance) and (Libs[IndexOf(name)].settings.Distance <= Dist) then
-    Libs[IndexOf(name)].functions.onDistance(Dist, blockpos, playerpos)
+    Libs[IndexOf(name)].functions.onDistance(Dist, ObjectId,ActivatedId,PlayerType)
   else if (on = 'Inside') and (Libs[IndexOf(name)].settings.onInside) then
-    Libs[IndexOf(name)].functions.onInside(blockpos, playerpos)
+    Libs[IndexOf(name)].functions.onInside(ObjectId,ActivatedId,PlayerType)
   else if (on = 'Above') and (Libs[IndexOf(name)].settings.onAbove) then
-    Libs[IndexOf(name)].functions.onAbove(side, blockpos, playerpos)
+    Libs[IndexOf(name)].functions.onAbove(ObjectId,ActivatedId,PlayerType)
   else if (on = 'Below') and (Libs[IndexOf(name)].settings.onBelow) then
-    Libs[IndexOf(name)].functions.onBelow(side, blockpos, playerpos)
+    Libs[IndexOf(name)].functions.onBelow(ObjectId,ActivatedId,PlayerType)
+  else if (on = 'Activate') and (Libs[IndexOf(name)].settings.onActivate) then
+    Libs[IndexOf(name)].functions.onActivate(ObjectId,ActivatedId,PlayerType)
   else result := false;
 end;
 
-function TDLLManager.LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
+function TDLLManager.LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
 var
   sr: TSearchRec;
   SL: TStringList;
@@ -144,7 +147,7 @@ Begin
       SL := TStringList.Create;
       SL.Delimiter := '.';
       SL.DelimitedText := sr.Name;
-      if Load(name + '\' + sr.Name, ListBox) and (myobj <> nil) then
+      if Load(name + '\' + sr.Name, ListBox, GetActivatedObject, PlayerKill, Win) and (myobj <> nil) then
       Begin
         myobj.Add(LoadJPEG(Libs[High(Libs)].Handle), SL[0], Libs[High(Libs)].Settings, LoadGIF(Libs[High(Libs)].Handle));
       End;
