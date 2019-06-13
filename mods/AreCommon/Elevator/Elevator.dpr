@@ -15,28 +15,27 @@ library Elevator;
 uses
   SysUtils,
   Classes,
-  Dialogs,
-  Graphics,
+  Vcl.Dialogs,
+  Vcl.Graphics,
   TFNW;
 
 var
   Settings: TSettings;
 
 
-function Init: pointer;
+function Init(TGetActivatedObject, TPlayerKill, TWin: Pointer): pointer;
 Begin
   Settings.Distance := 0;
   Settings.onDistance := false;
-  Settings.onActivate := true;
+  Settings.onActivate := false;
   Settings.onInside := false;
-  Settings.onAbove := false;
+  Settings.onAbove := true;
   Settings.onBelow := false;
 
   Settings.collision := true;
   Settings.gravity := false;
-  Settings.driven := false;
   Settings.Transparent := clWhite;
-  Settings.animation := true;
+  Settings.animation := false;
   Settings.AnimPos.X := 0;
   Settings.AnimPos.Y := 0;
 
@@ -44,15 +43,11 @@ Begin
   result := @Settings;
 End;
 
-function onActivate:boolean;
-Begin
-  if Settings.collision = true then
-    Settings.collision := false
-  else
-    Settings.collision := true;
-End;
+procedure onAbove(ObjectId,ActivatedId,PlayerType: Byte; Player:PPlayer);
+begin
+end;
 
-exports Init, onActivate;
+exports Init, onAbove;
 
 begin
 end.

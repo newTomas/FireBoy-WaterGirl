@@ -2,7 +2,7 @@ unit TFNW;
 
 interface
 
-uses Vcl.Imaging.Jpeg, Graphics, Windows, ExtCtrls, Vcl.Imaging.GIFImg, Classes, Math, Controls, Dialogs, SysUtils, IdContext,
+uses Vcl.Imaging.Jpeg, Vcl.Graphics, Windows, Vcl.ExtCtrls, Vcl.Imaging.GIFImg, Classes, Math, Vcl.Controls, Vcl.Dialogs, SysUtils, IdContext,
 IdHashMessageDigest, idHash;
 
 type
@@ -65,6 +65,16 @@ type
       procedure SetPos(Left, Top: Integer);
       procedure FromTo(PercentFrom: Byte=0; PercentTo: Byte=128);
       constructor Create(AOwner: TComponent; GifImg: TGIFImage);
+  end;
+  PPlayer = ^TPlayer;
+  TPlayer = record
+    Left, Top: Word;
+    img: TImage;
+    jump: Byte;
+    gravity: record
+      left, right, down, up: Byte;
+    end;
+    anim: TAnim;
   end;
   TObj = class
     private

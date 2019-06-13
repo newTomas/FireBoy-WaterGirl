@@ -15,28 +15,33 @@ library Stoper;
 uses
   SysUtils,
   Classes,
-  Dialogs,
-  Graphics,
+  Vcl.Dialogs,
+  Vcl.Graphics,
   TFNW;
 
 var
   Settings: TSettings;
+  GetActivatedObject: TGetActivatedObject;
+  PlayerKill: TPlayerKill;
+  Win: TWin;
 
-
-function Init: pointer;
+function Init(TGetActivatedObject, TPlayerKill, TWin: Pointer): pointer;
 Begin
+  GetActivatedObject := TGetActivatedObject;
+  PlayerKill := TPlayerKill;
+  Win := TWin;
+
   Settings.Distance := 0;
   Settings.onDistance := false;
-  Settings.onActivate := true;
-  Settings.onInside := false;
+  Settings.onActivate := false;
+  Settings.onInside := true;
   Settings.onAbove := false;
   Settings.onBelow := false;
 
-  Settings.collision := true;
+  Settings.collision := false;
   Settings.gravity := false;
-  Settings.driven := false;
   Settings.Transparent := clWhite;
-  Settings.animation := true;
+  Settings.animation := false;
   Settings.AnimPos.X := 0;
   Settings.AnimPos.Y := 0;
 
@@ -44,15 +49,12 @@ Begin
   result := @Settings;
 End;
 
-function onActivate:boolean;
+procedure onInside(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
 Begin
-  if Settings.collision = true then
-    Settings.collision := false
-  else
-    Settings.collision := true;
+  if PlayerType = 1 then  := true;
 End;
 
-exports Init, onActivate;
+exports Init, onInside;
 
 begin
 end.

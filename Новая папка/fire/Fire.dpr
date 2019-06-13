@@ -21,7 +21,7 @@ uses
 
 var
   Settings: TSettings;
-  GetActivatedObject: function(id: Byte): TMapObject;
+  GetActivatedObject: TGetActivatedObject;
   PlayerKill: TPlayerKill;
   Win: TWin;
 
@@ -50,9 +50,9 @@ Begin
   result := @Settings;
 End;
 
-procedure onInside(ObjectId,ActivatedId,PlayerType: Byte);
+procedure onInside(ObjectId,ActivatedId,PlayerType: Byte; Player:PPlayer);
 Begin
-  if (PlayerType = 0) then PlayerKill(PlayerType);
+  if (PlayerType = 1) then PlayerKill(PlayerType);
 End;
 
 exports Init, onInside;

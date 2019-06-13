@@ -16,7 +16,7 @@ type
     function UnLoad(name: string; ListBox: TListBox=nil): boolean;
     procedure UnLoadAll(ListBox: TListBox=nil);
     function GetHandle(Index: Word):THandle;
-    function Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte): boolean;
+    function Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player:PPlayer): boolean;
   private
 
   public
@@ -32,7 +32,7 @@ var
       onAbove: procedure(ObjectId,ActivatedId,PlayerType: Byte);
       onBelow: procedure(ObjectId,ActivatedId,PlayerType: Byte);
       onDistance: procedure(Dist: Word; ObjectId,ActivatedId,PlayerType: Byte);
-      onInside: procedure(ObjectId,ActivatedId,PlayerType: Byte);
+      onInside: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
       onActivate: procedure(ObjectId,ActivatedId,PlayerType: Byte);
     end;
     settings: ^TSettings;
@@ -121,13 +121,13 @@ Begin
   End;
 End;
 
-function TDLLManager.Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte): boolean;
+function TDLLManager.Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer): boolean;
 begin
   result := true;
   if (on = 'Distance') and (Libs[IndexOf(name)].settings.onDistance) and (Libs[IndexOf(name)].settings.Distance <= Dist) then
     Libs[IndexOf(name)].functions.onDistance(Dist, ObjectId,ActivatedId,PlayerType)
   else if (on = 'Inside') and (Libs[IndexOf(name)].settings.onInside) then
-    Libs[IndexOf(name)].functions.onInside(ObjectId,ActivatedId,PlayerType)
+    Libs[IndexOf(name)].functions.onInside(ObjectId,ActivatedId,PlayerType, Player)
   else if (on = 'Above') and (Libs[IndexOf(name)].settings.onAbove) then
     Libs[IndexOf(name)].functions.onAbove(ObjectId,ActivatedId,PlayerType)
   else if (on = 'Below') and (Libs[IndexOf(name)].settings.onBelow) then

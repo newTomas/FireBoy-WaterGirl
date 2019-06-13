@@ -12,6 +12,7 @@ type
     width, height: Word;
     name: string[32];
     activate: Word; // Какой объект активирует
+    activated: boolean;
   end;
   PGetActivatedObject = ^TGetActivatedObject;
   TGetActivatedObject = function(id: Byte): PMapObject;
@@ -65,6 +66,16 @@ type
       procedure SetPos(Left, Top: Integer);
       procedure FromTo(PercentFrom: Byte=0; PercentTo: Byte=128);
       constructor Create(AOwner: TComponent; GifImg: TGIFImage);
+  end;
+  PPlayer = ^TPlayer;
+  TPlayer = record
+    Left, Top: Word;
+    img: TImage;
+    jump: Byte;
+    gravity: record
+      left, right, down, up: Byte;
+    end;
+    anim: TAnim;
   end;
   TObj = class
     private

@@ -2,13 +2,30 @@ unit TFNW;
 
 interface
 
-uses Jpeg, Graphics, Windows, ExtCtrls, GIFImg,
- Classes, Math, Controls, Dialogs, SysUtils, IdContext;
+uses Vcl.Imaging.Jpeg, Vcl.Graphics, Windows, Vcl.ExtCtrls, Vcl.Imaging.GIFImg, Classes, Math, Vcl.Controls, Vcl.Dialogs, SysUtils, IdContext,
+IdHashMessageDigest, idHash;
 
 type
+  PMapObject = ^TMapObject;
+  TMapObject = record
+    img: TImage;
+    width, height: Word;
+    name: string[32];
+    activate: Word; // Какой объект активирует
+  end;
+  PGetActivatedObject = ^TGetActivatedObject;
+  TGetActivatedObject = function(id: Byte): PMapObject;
+  PWin = ^TWin;
+  TWin = procedure;
+  PPlayerKill = ^TPlayerKill;
+  TPlayerKill = procedure(playertype: Byte);
+  TMapsList = array of record
+    name, hash: string;
+  end;
   TPing = record
     name: string;
     map: string;
+    hash: string;
     maxplayers: byte;
     players: byte;
     work: boolean;
@@ -21,11 +38,16 @@ type
     activate: Byte;
     Transparent: TColor;
     onDistance, onInside, onAbove, onBelow, onActivate: Boolean;
-    collision, gravity, driven, animation: boolean;
+    collision, gravity, animation: boolean;
     AnimPos: TPoint;
   end;
   TSettingsMap = record
     width, height: Word;
+    background: record
+      width, height: Word;
+    end;
+    players: Byte;
+    start: array[0..255] of Tpos;
   end;
   TMap = record
     x, y: Word;
@@ -36,13 +58,23 @@ type
   TAnim = class
     private
       gif: TGIFImage;
-      frame: Word;
     public
+      frame: Word;
       Image: TImage;
       procedure Change(Percent: Byte);
       procedure SetPos(Left, Top: Integer);
       procedure FromTo(PercentFrom: Byte=0; PercentTo: Byte=128);
       constructor Create(AOwner: TComponent; GifImg: TGIFImage);
+  end;
+  PPlayer = ^TPlayer;
+  TPlayer = record
+    Left, Top: Word;
+    img: TImage;
+    jump: Byte;
+    gravity: record
+      left, right, down, up: Byte;
+    end;
+    anim: TAnim;
   end;
   TObj = class
     private
@@ -70,8 +102,26 @@ type
   end;
 
 function RoundUp(Value, N: Integer): Integer;
+function MD5(const fileName : string) : string;
 
 implementation
+
+function MD5(const fileName : string) : string;
+ var
+   idmd5 : TIdHashMessageDigest5;
+   fs : TFileStream;
+   hash : T4x4LongWordRecord;
+ begin
+   idmd5 := TIdHashMessageDigest5.Create;
+   fs := TFileStream.Create(fileName, fmOpenRead OR fmShareDenyWrite) ;
+   try
+     //result := idmd5.AsHex(idmd5.HashValue(fs));
+     result := idmd5.HashStreamAsHex(fs);
+   finally
+     fs.Free;
+     idmd5.Free;
+   end;
+ end;
 
 function RoundUp(Value, N: Integer): Integer;
 asm

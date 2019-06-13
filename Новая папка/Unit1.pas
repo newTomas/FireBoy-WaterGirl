@@ -118,15 +118,7 @@ var
     name: string;
     ptype: Byte;
   end;
-  players: array of record
-    Left, Top: Word;
-    img: TImage;
-    jump: Byte;
-    gravity: record
-      left, right, down, up: Byte;
-    end;
-    anim: TAnim;
-  end;
+  players: array of PPlayer;
   gamewidth, gameheight: Word;
   keys: record
     W,A,S,D,E:boolean;
@@ -137,23 +129,99 @@ implementation
 
 {$R *.dfm}
 
-procedure Activate;
+{procedure Activate;
 var
   i: Word;
+    stngs: ^TSettings;
+    Begin
+      for I := 0 to High(obj) do
+        Begin
+            stngs := myobj.Settings[manager.IndexOf('mods\' + obj[i].name + '.dll')];
+                if stngs.onActivate then
+
+                    if (players[0].Left <= obj[i].img.Left+obj[i].img.Width)
+                        and (obj[i].img.Left <= players[0].Left+players[0].img.Width)
+                            and (players[0].Top <= obj[i].img.Top+obj[i].img.Height)
+                                and (obj[i].img.Top <= players[0].Top+players[0].img.Height) then result := true;
+
+                                  End;
+                                  End;}
+
+function Inside(i: Word):boolean;
+Begin
+  if (players[player.ptype].Left <= obj[i].img.Left+obj[i].img.Width)
+  and (obj[i].img.Left <= players[player.ptype].Left+players[player.ptype].img.Width)
+  and (players[player.ptype].Top <= obj[i].img.Top+obj[i].img.Height)
+  and (obj[i].img.Top <= players[player.ptype].Top+players[player.ptype].img.Height) then result := true;
+End;
+
+{procedure CheckDistance;
+var
+  i: word;
+    stngs: ^TSettings;
+      dist: Word;
+        plr: TPos; //player center
+          bj: TPos; // Obj center
+          Begin
+            for I := 0 to High(obj) do
+              Begin
+                  stngs := myobj.Settings[manager.IndexOf('mods\' + obj[i].name + '.dll')];
+                      if stngs.onDistance then
+                          Begin
+                                dist := Distance(players[player.ptype].Left + players[player.ptype].img.Width div 2, players[player.ptype].Top + players[player.ptype].img.Height div 2, obj[i].img.Left + obj[i].img.Width div 2, obj[i].img.Top + obj[i].img.Height div 2);
+                                      if dist < stngs.Distance then manager.Run('mods\' + obj[i].name + '.dll', 'Distance', dist, i, obj[i].activate, player.ptype);
+                                          End;
+                                            end;
+                                            End;}
+
+procedure BelowAbove;
+var
+  i, e: word;
   stngs: ^TSettings;
 Begin
   for I := 0 to High(obj) do
   Begin
     stngs := myobj.Settings[manager.IndexOf('mods\' + obj[i].name + '.dll')];
-    if stngs.onActivate then
-
-    if (players[0].Left <= obj[i].img.Left+obj[i].img.Width)
-    and (obj[i].img.Left <= players[0].Left+players[0].img.Width)
-    and (players[0].Top <= obj[i].img.Top+obj[i].img.Height)
-    and (obj[i].img.Top <= players[0].Top+players[0].img.Height) then result := true;
-
-  End;
+    if stngs.onAbove then
+      if obj[i].activated then
+      Begin
+        for e := 0 to High(obj) do
+          if (obj[i].img.Top <= obj[e].img.Top + obj[e].img.Width + 1) and (obj[i].img.Left = obj[e].img.Left) and ((obj[e].name = 'WaterRails') or (obj[e].name = 'FireRails'))  then
+          begin
+            if (players[player.ptype].Left < obj[i].img.Left + obj[i].img.Width) and (players[player.ptype].Left + players[player.ptype].img.Width > obj[i].img.Left)then
+              players[player.ptype].Top := players[player.ptype].Top + 1;
+            obj[i].img.Top := obj[i].img.Top + 1;
+          end;
+        //if Inside(i) then manager.Run('mods\' + obj[i].name + '.dll', 'Above', 0, i, obj[i].activate, player.ptype);
+        //players[player.ptype].Top := players[player.ptype].Top - 1;
+      end else
+        for e := 0 to High(obj) do
+          if (obj[i].img.Top + obj[i].img.Height >= obj[e].img.Top - 1) and (obj[i].img.Left = obj[e].img.Left) and ((obj[e].name = 'WaterRails') or (obj[e].name = 'FireRails'))  then
+            obj[i].img.Top := obj[i].img.Top - 1
+    else if stngs.onBelow then
+    Begin
+      players[player.ptype].Top := players[player.ptype].Top - 1;
+      //if Inside(i) then manager.Run('mods\' + obj[i].name + '.dll', 'Below', 0, i, obj[i].activate, player.ptype);
+      players[player.ptype].Top := players[player.ptype].Top + 1;
+    end;
+  end;
 End;
+
+procedure EPressed;
+var
+  i, e:Word;
+begin
+  for i := 0 to High(obj) do
+    if (players[player.ptype].Left < obj[i].img.Left + obj[i].img.Width) and (players[player.ptype].Left + players[player.ptype].img.Width > obj[i].img.Left)
+    and (players[player.ptype].Top < obj[i].img.Top + obj[i].img.Height) and (players[player.ptype].Top + players[player.ptype].img.Height > obj[i].img.Top) then
+      if (obj[i].name = 'WaterPlate') or (obj[i].name = 'WaterLever') or (obj[i].name = 'FirePlate') or (obj[i].name = 'FireLever') then
+        if obj[0].activated then
+          for e := 0 to High(obj) do
+            obj[e].activated := true
+        else
+          for e := 0 to High(obj) do
+            obj[e].activated := false
+end;
 
 function Collision:boolean;
 var
@@ -164,60 +232,60 @@ Begin
   for I := 0 to High(obj) do
   Begin
     stngs := myobj.Settings[manager.IndexOf('mods\' + obj[i].name + '.dll')];
-    if (players[0].Left <= obj[i].img.Left+obj[i].img.Width)
-    and (obj[i].img.Left <= players[0].Left+players[0].img.Width)
-    and (players[0].Top <= obj[i].img.Top+obj[i].img.Height)
-    and (obj[i].img.Top <= players[0].Top+players[0].img.Height) then result := true;
+    result := Inside(i);
 
     if result then
     Begin
       if stngs.onInside then
       Begin
-        manager.Run('mods\' + obj[i].name + '.dll', 'Inside', 0, i, obj[i].activate, player.ptype);
+        manager.Run('mods\' + obj[i].name + '.dll', 'Inside', 0, i, obj[i].activate, player.ptype, @players[player.ptype]);
         result := false;
       End;
+      if keys.E and stngs.onActivate then manager.Run('mods\' + obj[i].name + '.dll', 'Activate', 0, i, obj[i].activate, player.ptype, players[player.ptype]);
+
+      if stngs.collision then result := true;
       exit;
     End;
 
   End;
-  if (players[0].Left < 0) or (players[0].Top < 0) or (Players[0].Left > Form1.ClientWidth-players[0].img.Width) or (Players[0].Top > Form1.ClientHeight-players[0].img.Height) then result := true;
+  if (players[player.ptype].Left < 0) or (players[player.ptype].Top < 0) or (Players[player.ptype].Left > Form1.ClientWidth-players[player.ptype].img.Width) or (Players[0].Top > Form1.ClientHeight-players[0].img.Height) then result := true;
 
 End;
 
+
 procedure MovePlayer;
 Begin
-  players[0].Left := players[0].Left + players[0].gravity.right;
-  if Collision then players[0].Left :=  players[0].Left - players[0].gravity.right;
-  players[0].Left := players[0].Left - players[0].gravity.left;
-  if Collision then players[0].Left :=  players[0].Left + players[0].gravity.left;
-  players[0].Left := players[0].Left - ord(keys.A) * 3;
-  if Collision then players[0].Left :=  players[0].Left + ord(keys.A) * 3;
-  players[0].Left := players[0].Left + ord(keys.D) * 3;
-  if Collision then players[0].Left :=  players[0].Left - ord(keys.D) * 3;
+  players[player.ptype].Left := players[player.ptype].Left + players[player.ptype].gravity.right;
+  if Collision then players[player.ptype].Left :=  players[player.ptype].Left - players[player.ptype].gravity.right;
+  players[player.ptype].Left := players[player.ptype].Left - players[player.ptype].gravity.left;
+  if Collision then players[player.ptype].Left :=  players[player.ptype].Left + players[player.ptype].gravity.left;
+  players[player.ptype].Left := players[player.ptype].Left - ord(keys.A) * 3;
+  if Collision then players[player.ptype].Left :=  players[player.ptype].Left + ord(keys.A) * 3;
+  players[player.ptype].Left := players[player.ptype].Left + ord(keys.D) * 3;
+  if Collision then players[player.ptype].Left :=  players[player.ptype].Left - ord(keys.D) * 3;
 
-  if players[0].gravity.down < 10 then inc(players[0].gravity.down);
-  players[0].Top := players[0].Top + players[0].gravity.down;
+  if players[player.ptype].gravity.down < 10 then inc(players[player.ptype].gravity.down);
+  players[player.ptype].Top := players[player.ptype].Top + players[player.ptype].gravity.down;
   if Collision then
   Begin
-    players[0].Top := players[0].Top - players[0].gravity.down;
-    players[0].gravity.down := 1;
+    players[player.ptype].Top := players[player.ptype].Top - players[player.ptype].gravity.down;
+    players[player.ptype].gravity.down := 1;
   end;
 
-  if keys.W and (players[0].Top = players[0].img.Top) then players[0].jump := 14;
-  players[0].Top := players[0].Top - players[0].jump;
-  if Collision then players[0].Top := players[0].Top + players[0].jump;
-  if players[0].jump > 0 then dec(players[0].jump);
+  if keys.W and (players[player.ptype].Top = players[player.ptype].img.Top) then players[player.ptype].jump := 14;
+  players[player.ptype].Top := players[player.ptype].Top - players[player.ptype].jump;
+  if Collision then players[player.ptype].Top := players[player.ptype].Top + players[player.ptype].jump;
+  if players[player.ptype].jump > 0 then dec(players[player.ptype].jump);
 
-  players[0].Top := players[0].Top - players[0].gravity.up;
-  if Collision then players[0].Top := players[0].Top + players[0].gravity.up;
+  players[player.ptype].Top := players[player.ptype].Top - players[player.ptype].gravity.up;
+  if Collision then players[player.ptype].Top := players[player.ptype].Top + players[player.ptype].gravity.up;
 
-  if (players[0].img.Left <> players[0].Left) or (players[0].img.Top <> players[0].Top) then TCP.Send('cords|'+IntToStr(players[0].Left)+'|'+IntToStr(players[0].Top));
+  if (players[player.ptype].img.Left <> players[player.ptype].Left) or (players[player.ptype].img.Top <> players[player.ptype].Top) then TCP.Send('cords|'+IntToStr(players[player.ptype].Left)+'|'+IntToStr(players[player.ptype].Top));
+  players[player.ptype].img.Left := players[player.ptype].Left;
+  players[player.ptype].img.Top := players[player.ptype].Top;
 
-  players[0].img.Left := players[0].Left;
-  players[0].img.Top := players[0].Top;
-
-  //if (players[0].jump = players[0].gravity.down) and (players[0].jump > 0) then ShowMessage(IntToStr(players[0].img.Top));
-
+  BelowAbove;
+  //CheckDistance;
 End;
 
 {procedure Main;
@@ -240,6 +308,8 @@ begin
     MovePlayer;
     //Sleep(31 - MilliSecondsBetween(Start, Now));
     Sleep(31);
+    if keys.E then
+      EPressed
   until (Terminated);
 end;
 
@@ -404,14 +474,15 @@ begin
       true: Begin
         if s = 'start' then
         Begin
-          Lobby.Hide;
+          player.ptype := Ord(Lobby.WaterGirlChoice.Checked);
+          Synchronize(Lobby.Hide);
           Form1.BorderStyle := bsNone;
           Form1.Left := 0;
           Form1.Top := 0;
           inlobby := false;
           SetLength(players, 2);
           LoadMap;
-          players[0].gravity.down := 1;
+          players[player.ptype].gravity.down := 1;
           cl2 := GameThread.Create(false);
         End
         else if s = 'FireChosen' then
@@ -515,6 +586,8 @@ begin
     cl2.DoTerminate;
     //cl2.Free;
   End;
+  TCP.Disconnect;
+  Sleep(35);
   CanClose := true;
 end;
 
