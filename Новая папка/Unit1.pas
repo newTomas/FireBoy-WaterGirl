@@ -362,6 +362,7 @@ begin
         obj[High(obj)].img.Top := save.objs[High(save.objs)].y;
         items[High(items)].top := obj[High(obj)].img.Top;
         obj[High(obj)].img.Align := alCustom;
+        obj[High(obj)].activated := false;
         break;
       End;
       if obj[High(obj)].name = '' then
