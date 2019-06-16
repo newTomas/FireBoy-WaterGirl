@@ -3,18 +3,20 @@ unit DLLManager;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Dialogs, Vcl.Imaging.pngimage, StdCtrls,
+  Windows, Messages, SysUtils, Variants, Classes, Dialogs, Jpeg, StdCtrls, GIFImg,
   TFNW;
 
 type
   TDLLManager = class
     function IndexOf(name: string):Word;
-    function Load(name: string; ListBox: TListBox=nil): boolean;
-    function LoadPNG(Handle: THandle):TPngImage;
-    function LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
+    function Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
+    function LoadJPEG(Handle: THandle):TJPEGImage;
+    function LoadGIF(Handle: THandle):TGIFImage;
+    function LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
     function UnLoad(name: string; ListBox: TListBox=nil): boolean;
     procedure UnLoadAll(ListBox: TListBox=nil);
     function GetHandle(Index: Word):THandle;
+    function Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer): boolean;
   private
 
   public
@@ -26,13 +28,14 @@ var
     name: string;
     Handle: THandle;
     functions: record
-      Init: function: TInit;
-      onAbove: procedure(side: byte; blockpos: Tpos; playerpos: Tpos);
-      onBelow: procedure(side: byte; blockpos: Tpos; playerpos: Tpos);
-      onDistance: procedure(Dist: Word; blockpos: Tpos; playerpos: Tpos);
-      onInside: procedure(blockpos: Tpos; playerpos: Tpos);
+      Init: function(GetActivatedObject, PlayerKill, Win: Pointer): Pointer;
+      onAbove: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
+      onBelow: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
+      onDistance: procedure(Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
+      onInside: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
+      onActivate: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
     end;
-    settings: TInit;
+    settings: ^TSettings;
   end;
   i: Word;
 
@@ -49,7 +52,7 @@ Begin
   end;
 End;
 
-function TDLLManager.Load(name: string; ListBox: TListBox=nil): boolean;
+function TDLLManager.Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
 var
   wideChars: PWideChar;
 Begin
@@ -59,7 +62,8 @@ Begin
   @Libs[High(Libs)].functions.Init:=nil;
   {ѕытаемс€ загрузить библиотеку}
   wideChars := PWideChar(WideString(name));
-  Libs[High(Libs)].Handle := LoadLibrary(wideChars);
+  //Libs[High(Libs)].Handle := LoadLibrary(wideChars);
+  Libs[High(Libs)].Handle := LoadLibrary(PAnsiChar(name));
   Libs[High(Libs)].name := name;
 
   if Libs[High(Libs)].Handle = 0 then
@@ -75,32 +79,65 @@ Begin
 
   if Libs[High(Libs)].Handle <> 0 then
   begin
-    @Libs[High(Libs)].functions.Init:=GetProcAddress(Libs[High(Libs)].Handle,'Init');
+    @Libs[High(Libs)].functions.Init := GetProcAddress(Libs[High(Libs)].Handle,'Init');
 
     if @Libs[High(Libs)].functions.Init <> nil then
-      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init;
+      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init(GetActivatedObject, PlayerKill, Win);
 
-    if (Libs[High(Libs)].settings.onDistance) and (@Libs[High(Libs)].functions.onDistance <> nil) then
+    if Libs[High(Libs)].settings.onDistance then
       @Libs[High(Libs)].functions.onDistance := GetProcAddress(Libs[High(Libs)].Handle,'onDistance');
 
-    if (Libs[High(Libs)].settings.onInside) and (@Libs[High(Libs)].functions.onInside <> nil) then
+    if Libs[High(Libs)].settings.onInside then
       @Libs[High(Libs)].functions.onInside:=GetProcAddress(Libs[High(Libs)].Handle,'onInside');
 
-    if (Libs[High(Libs)].settings.onAbove) and (@Libs[High(Libs)].functions.onAbove <> nil) then
+    if Libs[High(Libs)].settings.onAbove then
       @Libs[High(Libs)].functions.onAbove := GetProcAddress(Libs[High(Libs)].Handle,'onAbove');
 
-    if (Libs[High(Libs)].settings.onBelow) and (@Libs[High(Libs)].functions.onBelow <> nil) then
+    if Libs[High(Libs)].settings.onBelow then
       @Libs[High(Libs)].functions.onBelow := GetProcAddress(Libs[High(Libs)].Handle,'onBelow');
   end;
 End;
 
-function TDLLManager.LoadPNG(Handle: THandle):TPngImage;
+function TDLLManager.LoadJPEG(Handle: THandle):TJPEGImage;
+var
+  RS: TResourceStream;
 Begin
-  result := TPngImage.Create;
-  result.LoadFromResourceName(Handle, 'pic');
+  result := TJPEGImage.Create;
+  RS := TResourceStream.Create(Handle, 'PIC', RT_RCDATA);
+  result.LoadFromStream(RS);
 End;
 
-function TDLLManager.LoadALL(name: string; ListBox: TListBox=nil; myobj: TObj=nil): boolean;
+function TDLLManager.LoadGIF(Handle: THandle):TGIFImage;
+var
+  RS: TResourceStream;
+Begin
+  result := nil;
+  exit;
+  if not Libs[High(Libs)].settings.animation then result := nil
+  else Begin
+    result := TGIFImage.Create;
+    RS := TResourceStream.Create(Handle, 'GIF', RT_RCDATA);
+    result.LoadFromStream(RS);
+  End;
+End;
+
+function TDLLManager.Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer): boolean;
+begin
+  result := true;
+  if (on = 'Distance') and (Libs[IndexOf(name)].settings.onDistance) and (Libs[IndexOf(name)].settings.Distance <= Dist) then
+    Libs[IndexOf(name)].functions.onDistance(Dist, ObjectId,ActivatedId,PlayerType,Player)
+  else if (on = 'Inside') and (Libs[IndexOf(name)].settings.onInside) then
+    Libs[IndexOf(name)].functions.onInside(ObjectId,ActivatedId,PlayerType,Player)
+  else if (on = 'Above') and (Libs[IndexOf(name)].settings.onAbove) then
+    Libs[IndexOf(name)].functions.onAbove(ObjectId,ActivatedId,PlayerType,Player)
+  else if (on = 'Below') and (Libs[IndexOf(name)].settings.onBelow) then
+    Libs[IndexOf(name)].functions.onBelow(ObjectId,ActivatedId,PlayerType,Player)
+  else if (on = 'Activate') and (Libs[IndexOf(name)].settings.onActivate) then
+    Libs[IndexOf(name)].functions.onActivate(ObjectId,ActivatedId,PlayerType,Player)
+  else result := false;
+end;
+
+function TDLLManager.LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
 var
   sr: TSearchRec;
   SL: TStringList;
@@ -110,9 +147,9 @@ Begin
       SL := TStringList.Create;
       SL.Delimiter := '.';
       SL.DelimitedText := sr.Name;
-      if Load(name + '\' + sr.Name, ListBox) and (myobj <> nil) then
+      if Load(name + '\' + sr.Name, ListBox, GetActivatedObject, PlayerKill, Win) and (myobj <> nil) then
       Begin
-        myobj.Add(LoadPNG(Libs[High(Libs)].Handle), SL[0]);
+        myobj.Add(LoadJPEG(Libs[High(Libs)].Handle), SL[0], Libs[High(Libs)].Settings, LoadGIF(Libs[High(Libs)].Handle));
       End;
     until FindNext(sr) <> 0;
   FindClose(sr);

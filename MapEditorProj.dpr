@@ -1,7 +1,7 @@
 program MapEditorProj;
 
 uses
-  Vcl.Forms,
+  Forms,
   MapEditor in 'MapEditor.pas' {Form1};
 
 {$R *.res}

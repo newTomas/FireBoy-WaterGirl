@@ -2,4 +2,6 @@
 *.identcache
 *.stat
 
+*.~*
 __history/
+__recovery/
