@@ -62,8 +62,8 @@ Begin
   @Libs[High(Libs)].functions.Init:=nil;
   {ѕытаемс€ загрузить библиотеку}
   wideChars := PWideChar(WideString(name));
-  //Libs[High(Libs)].Handle := LoadLibrary(wideChars);
-  Libs[High(Libs)].Handle := LoadLibrary(PAnsiChar(name));
+  Libs[High(Libs)].Handle := LoadLibrary(wideChars);
+  //Libs[High(Libs)].Handle := LoadLibrary(PAnsiChar(name));
   Libs[High(Libs)].name := name;
 
   if Libs[High(Libs)].Handle = 0 then

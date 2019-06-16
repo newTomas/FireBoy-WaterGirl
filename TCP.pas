@@ -95,6 +95,7 @@ var
   FS: TFileStream;
   hash: string;
   i: word;
+  f: file;
 begin
   IdTCPClient.Disconnect;
   IdTCPClient.Host := IP;
@@ -117,7 +118,14 @@ begin
     if result.hash = '' then
     Begin
       IdTCPClient.Socket.WriteLn('download');
+      AssignFile(f,'maps/'+result.map+'.dat');
+      Rewrite(f);
+      CloseFile(f);
+      AssignFile(f,'maps/'+result.map+'.dat.settings');
+      Rewrite(f);
+      CloseFile(f);
       FS := TFileStream.Create('maps/'+result.map+'.dat', fmOpenWrite);
+      FS.Size := -1;
       IdTCPClient.Socket.ReadStream(FS);
       FS.Free;
       FS := TFileStream.Create('maps/'+result.map+'.dat.settings', fmOpenWrite);

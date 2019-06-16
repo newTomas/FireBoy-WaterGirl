@@ -33,6 +33,7 @@ type
   Tpos = record
     x, y: Word;
   end;
+  PSettings = ^TSettings;
   TSettings = record
     Distance: Word;
     activate: Byte;
@@ -53,7 +54,7 @@ type
     x, y: Word;
     width, height: Word;
     name: string[32];
-    activate: Word; //Какой объект активирует
+    activate: Integer; //Какой объект активирует
   end;
   TAnim = class
     private
@@ -81,7 +82,7 @@ type
       arr: array of record
         ObjPic: TJPEGImage;
         ObjName: string;
-        Settings: ^TSettings;
+        Settings: PSettings;
         GIF: TGIFImage;
       end;
       function GetPic(Index: Word): TJPEGImage;

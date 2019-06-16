@@ -43,8 +43,7 @@ type
     procedure mv(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
     procedure md(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
     procedure mu(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
-    
-    procedure FormPaint(Sender: TObject);
+
     procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure FormMouseUp(Sender: TObject; Button: TMouseButton;
@@ -70,6 +69,7 @@ var
   Form1: TForm1;
   Form2: TForm;
   FormPanel: TForm;
+  myobj: TObj;
   settings: record
     width, height, players: TEdit;
     start: record
@@ -97,7 +97,7 @@ var
     end;
   end;
   obj: record
-    activate: Word;
+    activate: Integer;
     x,y: Word;
     Width, Height: Word;
     down: boolean;
@@ -107,7 +107,7 @@ var
       width, height: Word;
       selected: boolean;
       name: string[32];
-      activate: Word;
+      activate: Integer;
     end;
   end;
   select: record
@@ -182,13 +182,20 @@ begin
 End;
 
 procedure TForm1.od(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
+var
+  Stngs: ^TSettings;
 Begin
   if Button = mbRight then
   Begin
-    if obj.activate = 0 then obj.activate := (Sender as TImage).Tag
+    if obj.activate = -1 then
+    Begin
+      stngs := myobj.Settings[manager.IndexOf('mods\'+obj.arr[(Sender as TImage).Tag].name+'.dll')];
+      if stngs.onActivate then obj.activate := (Sender as TImage).Tag;
+    End
     else Begin
-      obj.arr[obj.activate].activate := (Sender as TImage).Tag;
-      obj.activate := 0;
+      if obj.arr[obj.activate].activate = (Sender as TImage).Tag then obj.arr[obj.activate].activate := -1
+      else if obj.activate <> (Sender as TImage).Tag then obj.arr[obj.activate].activate := (Sender as TImage).Tag;
+      obj.activate := -1;
     End;
   End else
   Begin
@@ -258,6 +265,7 @@ Begin
     obj.arr[High(obj.arr)].img.Height := obj.arr[High(obj.arr)].img.Picture.Bitmap.Height;
     obj.arr[High(obj.arr)].width := obj.arr[High(obj.arr)].img.Width;
     obj.arr[High(obj.arr)].height := obj.arr[High(obj.arr)].img.Height;
+    obj.arr[High(obj.arr)].activate := -1;
 
     obj.arr[High(obj.arr)].img.tag := High(obj.arr);
 
@@ -345,6 +353,7 @@ Begin
   result := false;
   SaveDialog := TSaveDialog.Create(self);
   SaveDialog.Filter := 'File of Map|*.dat';
+  SaveDialog.DefaultExt := 'dat';
   if SaveDialog.Execute then
   Begin
     mapname := SaveDialog.FileName;
@@ -357,7 +366,7 @@ Begin
     AssignFile(F2, mapname);
     Rewrite(F2);
 
-    for i := 0 to High(obj.arr) do
+    if length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
     Begin
       SetLength(save.objs, Length(save.objs)+1);
       save.objs[i].x := obj.arr[i].img.Left;
@@ -454,7 +463,6 @@ var
   animbit: TBitMap;
   test: TImage;
   i: Word;
-  myobj: TObj;
   Stngs: ^TSettings;
   bkg: TJPEGImage;
 
@@ -486,6 +494,7 @@ begin
 
   myobj := TObj.Create;
   manager.LoadALL('mods', nil, myobj, nil, nil, nil);
+  obj.activate := -1;
 
   if myobj.Count > 0 then for i := 0 to myobj.Count - 1 do
   Begin
@@ -664,38 +673,6 @@ begin
   Form1.Repaint;
 end;
 
-procedure TForm1.FormPaint(Sender: TObject);
-var
-  x,y: Word;
-  i: Word;
-begin
-  //Canvas.Draw(0,0,bkg.Picture.Bitmap);
-  {Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := $e6e6e6;
-  Canvas.Pen.Width := 1;
-
-  for x := 1 to ClientWidth div 10 do
-  Begin
-    Canvas.MoveTo(x*10, 0);
-    Canvas.LineTo(x*10, ClientHeight);
-  End;
-  for y := 1 to ClientHeight div 10 do
-  Begin
-    Canvas.MoveTo(0, y*10);
-    Canvas.LineTo(ClientWidth, y*10);
-  End;}
-
-
-  {Canvas.Pen.Width := 2;
-  Canvas.Pen.Color := clBlue;
-
-  if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
-    if(obj.arr[i].selected) then Canvas.Rectangle(obj.arr[i].img.Left - 1, obj.arr[i].img.Top - 1, obj.arr[i].img.Width + obj.arr[i].img.Left + 2, obj.arr[i].img.Height + obj.arr[i].img.Top + 2);
-
-  Canvas.Pen.Style := psDash;
-  Canvas.Pen.Color := clBlue;}
-end;
-
 procedure TForm1.N2Click(Sender: TObject);
 var
   opendialog: TOpenDialog;
@@ -708,11 +685,13 @@ begin
     openDialog.Filter := 'File of Map|*.dat';
     if opendialog.Execute then
     Begin
+      Timer1.Enabled := false;
       if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do obj.arr[i].img.Free;
       SetLength(obj.arr, 0);
       mapname := opendialog.FileName;
       ApplyName;
       LoadMap;
+      Timer1.Enabled := true;
     End;
   End;
 end;
@@ -749,26 +728,26 @@ var
   i: Word;
   x,y: Word;
 begin
-  {Canvas.Pen.Style := psSolid;
-  Canvas.Pen.Color := $e6e6e6;
-  Canvas.Pen.Width := 1;
-
-  for x := 1 to ClientWidth div 10 do
-  Begin
-    Canvas.MoveTo(x*10, 0);
-    Canvas.LineTo(x*10, ClientHeight);
-  End;
-  for y := 1 to ClientHeight div 10 do
-  Begin
-    Canvas.MoveTo(0, y*10);
-    Canvas.LineTo(ClientWidth, y*10);
-  End;   }
-
   Canvas.Pen.Width := 2;
   Canvas.Pen.Color := clBlue;
 
+  Refresh;
+
   if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
+  Begin
     if(obj.arr[i].selected) then Canvas.Rectangle(obj.arr[i].img.Left - 1, obj.arr[i].img.Top - 1, obj.arr[i].img.Width + obj.arr[i].img.Left + 2, obj.arr[i].img.Height + obj.arr[i].img.Top + 2);
+    if(obj.arr[i].activate > 0) then
+    begin
+      Canvas.MoveTo(obj.arr[i].img.Left + obj.arr[i].img.Width div 2, obj.arr[i].img.Top + obj.arr[i].img.Height div 2);
+      Canvas.LineTo(obj.arr[obj.arr[i].activate].img.Left + obj.arr[obj.arr[i].activate].img.Width div 2, obj.arr[obj.arr[i].activate].img.Top + obj.arr[obj.arr[i].activate].img.Height div 2);
+    end;
+  End;
+
+  if(obj.activate > 0) then
+  Begin
+    Canvas.MoveTo(obj.arr[obj.activate].img.Left + obj.arr[obj.activate].img.Width div 2, obj.arr[obj.activate].img.Top + obj.arr[obj.activate].img.Height div 2);
+    Canvas.LineTo(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+  End;
 
   Canvas.Pen.Style := psDash;
   Canvas.Pen.Color := clBlue;
@@ -843,6 +822,7 @@ begin
   Form2.Show;
   Form2.OnCloseQuery := setformclose;
   Form1.Enabled := false;
+  FormPanel.Enabled := false;
 end;
 
 procedure TForm1.N6Click(Sender: TObject);

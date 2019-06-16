@@ -115,13 +115,19 @@ Begin
 End;
 
 procedure TForm1.IdTCPServer1Connect(AContext: TIdContext);
+var
+  FS: TFileStream;
 begin
   AContext.Connection.Socket.WriteLn(settings.name+'|'+settings.map+'|'+IntToStr(Length(players))+'|'+IntToStr(settings.maxplayers));
   AContext.Connection.Socket.WriteLn(settings.hash);
   if AContext.Connection.Socket.ReadLn = 'download' then
   Begin
-    AContext.Connection.Socket.WriteFile('maps/'+settings.map+'.dat');
-    AContext.Connection.Socket.WriteFile('maps/'+settings.map+'.dat.settings');
+    FS := TFileStream.Create('maps/'+settings.map+'.dat', fmOpenRead);
+    AContext.Connection.Socket.Write(FS,FS.Size,true);
+    FS.Free;
+    FS := TFileStream.Create('maps/'+settings.map+'.dat.settings', fmOpenRead);
+    AContext.Connection.Socket.Write(FS,FS.Size,true);
+    FS.Free;
   end;
   SetLength(players, Length(players)+1);
   //players[High(players)].nick := AContext.Connection.Socket.ReadLn;

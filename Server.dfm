@@ -86,6 +86,7 @@ object Form1: TForm1
   end
   object IdIPWatch1: TIdIPWatch
     Active = False
+    HistoryEnabled = False
     HistoryFilename = 'iphist.dat'
     Left = 168
     Top = 160
