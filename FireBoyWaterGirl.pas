@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, Buttons, Math,
-  Mask, ExtCtrls, TCP, TFNW, DLLManager, DateUtils, ShellApi;
+  Mask, ExtCtrls, TCP, TFNW, DLLManager, DateUtils, ShellApi, Vcl.ComCtrls, IdGlobal;
 
 type
   TForm1 = class(TForm)
@@ -16,6 +16,13 @@ type
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure OnConnectClick(Sender:TObject);
+    procedure OnReturnToMMClick(Sender: TObject);
+    procedure OnPlayClick(Sender: TObject);
+    procedure OnCreateServerClick(Sender: TObject);
+    procedure OnModsClick(Sender: TObject);
+    procedure OnSettingsClick(Sender: TObject);
+    procedure OnExitClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -42,62 +49,15 @@ type
     procedure Execute; override;
   end;
 
-  IMainMenu = class
-    Btn1: TBitBtn;
-    Btn2: TBitBtn;
-    Btn3: TBitBtn;
-    Btn4: TBitBtn;
-    Btn5: TBitBtn;
-    procedure Show;
-    procedure Hide;
-    procedure OnClick(Sender: TObject);
-  end;
-
-  IMods = class
-    list: TListBox;
-    return: TButton;
-    procedure Show;
-    procedure Hide;
-    procedure OnClick(Sender: TObject);
-  end;
-
-  IServerSearch = class
-    //list: TListBox;
-    ServerIP: TEdit;
-    ServerInfo: TListBox;
-    ReturnBtn: TBitBtn;
-    GetInfoBtn: TBitBtn;
-    ConnectBtn: TBitBtn;
-    procedure Show;
-    procedure Hide;
-    procedure OnClick(Sender: TObject);
-  end;
-
-  ILobby = class
-    MapLabel: TLabel;
-    PlayersList: TListBox;
-    ReadyCheckbox: TCheckBox;
-    FireBoyChoice: TRadioButton;
-    WaterGirlChoice: TRadioButton;
-    Exchange: TRadioButton;
-    procedure Show;
-    procedure Hide;
-    procedure OnClick(Sender: TObject);
-  end;
-
 var
   Form1: TForm1;
   myobj: TObj;
+  mapsettings: TMapSettings;
   ModsFunctions: IModsFunctions;
-  MainMenu: IMainMenu;
-  Mods: IMods;
-  Lobby: ILobby;
   TCP: TCPClient;
   cl1: TCPThread;
   cl2: GameThread;
-  SearchServer: IServerSearch;
   manager: TDLLManager;
-  inlobby: Boolean;
   items: array of record
     width, height, left, top, font: Word;
   end;
@@ -106,11 +66,11 @@ var
     objs: array of Tmap;
     settings: TSettingsMap;
   end;
-  F1: File of TSettingsMap;
+  //F1: File of TSettingsMap;
   F2: File of Tmap;
   namemap: string;
   img: array of record
-    img: TImage;
+    anim: TAnim;
     name: string[32];
   end;
   obj: array of TMapObject;
@@ -120,14 +80,29 @@ var
   end;
   players: array of TPlayer;
   gamewidth, gameheight: Word;
-  keys: record
-    W,A,S,D,E:boolean;
+  keysPressed: record
+    W,A,S,D,E: boolean;
   end;
+  CurrentScene: string;
 
 
 implementation
 
 {$R *.dfm}
+
+procedure ChangeScene(NewScene: string);
+Begin
+  CurrentScene := NewScene;
+  try
+    (Form1.FindComponent(CurrentScene) as TPanel).Visible := false;
+  finally
+  end;
+
+  try
+    (Form1.FindComponent(NewScene) as TPanel).Visible := true;
+  finally
+  end;
+End;
 
 function Inside(i: Word):boolean;
 Begin
@@ -137,7 +112,7 @@ Begin
   and (players[player.ptype].Top <= obj[i].img.Top+obj[i].img.Height)
   and (obj[i].img.Top <= players[player.ptype].Top+players[player.ptype].img.Height) then result := true;
 End;
-
+ {
 procedure CheckDistance;
 var
   i: word;
@@ -242,23 +217,23 @@ Begin
   players[player.ptype].img.Left := players[player.ptype].Left;
   players[player.ptype].img.Top := players[player.ptype].Top;
 
-  //BelowAbove;
-  //CheckDistance;
+  BelowAbove;
+  CheckDistance;
 
   //if (players[player.ptype].jump = players[player.ptype].gravity.down) and (players[player.ptype].jump > 0) then ShowMessage(IntToStr(players[player.ptype].img.Top));
 
-End;
+End;  }
 
-{procedure Main;
+procedure Main;
 var
   Start: TDateTime;
 Begin
   //Start:=Now;
-  MovePlayer;
+  //MovePlayer;
   //Sleep(31 - MilliSecondsBetween(Start, Now));
   Sleep(31);
   Main;
-End; }
+End;
 
 { GameThread }
 
@@ -266,12 +241,12 @@ procedure GameThread.Execute;
 begin
   repeat
     //Start:=Now;
-    MovePlayer;
+    //MovePlayer;
     //Sleep(31 - MilliSecondsBetween(Start, Now));
     Sleep(20);
   until (Terminated);
 end;
-
+{
 function LoadMap: boolean;
 var
   i: Word;
@@ -295,16 +270,14 @@ begin
     SetLength(save.objs,Length(save.objs)+1);
     Read(F2,save.objs[High(save.objs)]);
     SetLength(obj,Length(obj)+1);
-    obj[High(obj)].activate := save.objs[High(save.objs)].activate;
+    obj[High(obj)].data := save.objs[High(save.objs)].data;
     obj[High(obj)].width := save.objs[High(save.objs)].width;
     obj[High(obj)].height := save.objs[High(save.objs)].height;
-    obj[High(obj)].img := TImage.Create(Form1);
-    obj[High(obj)].img.Parent := Form1;
     if Length(img) > 0 then
     Begin
       for i := 0 to High(img) do if img[i].name = save.objs[High(save.objs)].name then
       Begin
-        obj[High(obj)].img.Picture.Bitmap := img[i].img.Picture.Bitmap;
+        obj[High(obj)].img.Assign(img[i].anim.Image);
         obj[High(obj)].name := save.objs[High(save.objs)].name;
         SetLength(items, Length(items)+1);
         obj[High(obj)].img.Tag := High(items);
@@ -313,9 +286,6 @@ begin
         obj[High(obj)].img.Height := obj[High(obj)].height;
         items[High(items)].height := obj[High(obj)].height;
         obj[High(obj)].img.Stretch := true;
-        obj[High(obj)].img.Picture.Bitmap.TransparentMode := tmFixed;
-        obj[High(obj)].img.Picture.Bitmap.TransparentColor := img[i].img.Picture.Bitmap.TransparentColor;
-        obj[High(obj)].img.Transparent := true;
         obj[High(obj)].img.Left := save.objs[High(save.objs)].x;
         items[High(items)].left := obj[High(obj)].img.Left;
         obj[High(obj)].img.Top := save.objs[High(save.objs)].y;
@@ -354,127 +324,97 @@ begin
 
   CloseFile(F2);
   result := true;
-End;
-
-procedure IMainMenu.Hide;
-Begin
-  Btn1.Visible := false;
-  Btn2.Visible := false;
-  Btn3.Visible := false;
-  Btn4.Visible := false;
-  Btn5.Visible := false;
-End;
-
-procedure IMainMenu.Show;
-Begin
-  Btn1.Visible := true;
-  Btn2.Visible := true;
-  Btn3.Visible := true;
-  Btn4.Visible := true;
-  Btn5.Visible := true;
-End;
-
-procedure IMods.Hide;
-begin
-  list.visible := false;
-  return.Visible := false;
-end;
-
-procedure IMods.OnClick(Sender: TObject);
-begin
-  Hide;
-  MainMenu.Show;
-end;
-
-procedure IMods.Show;
-begin
-  list.visible := true;
-  return.Visible := true;
-end;
-
-procedure IMainMenu.OnClick(Sender: TObject);
-begin
-  case (Sender as TBitBtn).Tag of
-    1: Begin
-       Hide;
-       SearchServer.Show;
-    End;
-    2: ShellExecute(Form1.Handle, 'open', 'ServerProj.exe', nil, nil, SW_SHOWNORMAL);
-    3: Begin
-      Hide;
-      Mods.Show;
-    End;
-    4: Sleep(1);
-    5: Form1.Close;
-  end;
-end;
+End;      }
 
 { TCPThread }
 
 procedure TCPThread.Execute;
 var
   s1: TStringList;
-  s: string;
+  msg: TMessageActions;
+  Buffer: TIdBytes;
+  f: file;
+  FS: TFileStream;
 begin
   repeat
-    s := TCP.Read;
-    case inlobby of
-      false: Begin
-        s1 := TStringList.Create;
-        s1.Delimiter := '|';
-        s1.StrictDelimiter := true;
-        s1.DelimitedText := s;
-        if s1[0] = 'cords' then
-        Begin
-          players[1-player.ptype].img.Left := StrToInt(s1[1]);
-          players[1-player.ptype].img.Top := StrToInt(s1[2]);
-        End;
-      End;
-      true: Begin
-        if s = 'start' then
-        Begin
-          player.ptype := ord(Lobby.WaterGirlChoice.Checked);
-          Synchronize(Lobby.Hide);
-          Form1.BorderStyle := bsNone;
-          Form1.Left := 0;
-          Form1.Top := 0;
-          inlobby := false;
-          SetLength(players, 2);
-          LoadMap;
-          players[player.ptype].gravity.down := 1;
-          cl2 := GameThread.Create(false);
-        End
-        else if s = 'FireChosen' then
-          Lobby.FireBoyChoice.Enabled := false
-        else if s = 'WaterChosen' then
-          Lobby.WaterGirlChoice.Enabled := false
-        else if s = 'NotChosen' then
-        begin
-          Lobby.FireBoyChoice.Enabled := true;
-          Lobby.WaterGirlChoice.Enabled := true;
-        end;
-        s1 := TStringList.Create;
-        s1.Delimiter := '|';
-        s1.StrictDelimiter := true;
-        s1.DelimitedText := s;
-        if s1[0] = 'info' then Lobby.MapLabel.Caption := 'Map: '+s1[1]
-        else if s1[0] = 'new' then Lobby.PlayersList.Items.Add(s1[1])
-        else if s1[0] = 'exit' then Lobby.PlayersList.Items.Delete(Lobby.PlayersList.Items.IndexOf(s1[2]));
-
-      End;
+    Buffer := TCP.Read;
+    BytesToRaw(Buffer, msg, sizeof(msg));
+    case msg of
+      Ping: ;
+      NeedsDownload: Begin
+        AssignFile(f,'maps/'+namemap+'.dat');
+        Rewrite(f);
+        CloseFile(f);
+        AssignFile(f,'maps/'+namemap+'.dat.settings');
+        Rewrite(f);
+        CloseFile(f);
+        FS := TFileStream.Create('maps/'+namemap+'.dat', fmOpenWrite);
+        FS.Size := -1;
+        IdTCPClient.Socket.ReadStream(FS);
+        FS.Free;
+        FS := TFileStream.Create('maps/'+namemap+'.dat.settings', fmOpenWrite);
+        IdTCPClient.Socket.ReadStream(FS);
+        FS.Free;
+      end;
+      PlayerMove: ;
+      ObjectMove: ;
+      PlayerConnected: ;
+      PlayerDisconnected: ;
+      ChangePlayerType: ;
+      TextMessage: ;
+      ChangeMap: ;
+      ChangeNick: ;
+      PlayerReady: ;
+      GameStart: ;
+      GameEnd: ;
     end;
+    {if CurrentScene = 'Game' then
+    Begin
+      //if msg.Action = PlayerMove then
+      s1 := TStringList.Create;
+      s1.Delimiter := '|';
+      s1.StrictDelimiter := true;
+      s1.DelimitedText := s;
+      if s1[0] = 'cords' then
+      Begin
+        players[1-player.ptype].img.Left := StrToInt(s1[1]);
+        players[1-player.ptype].img.Top := StrToInt(s1[2]);
+      End;
+    End else if CurrentScene = 'Lobby' then
+    Begin
+      if s = 'start' then
+      Begin
+        player.ptype := (TForm1.FindComponent('LPlayerType') as TRadioGroup).ItemIndex;
+        ChangeScene('Game');
+        Form1.BorderStyle := bsNone;
+        Form1.Left := 0;
+        Form1.Top := 0;
+        SetLength(players, 2);
+        LoadMap;
+        players[player.ptype].gravity.down := 1;
+        cl2 := GameThread.Create(false);
+      End
+      else if s = 'FireChosen' then
+        Lobby.FireBoyChoice.Enabled := false
+      else if s = 'WaterChosen' then
+        Lobby.WaterGirlChoice.Enabled := false
+      else if s = 'NotChosen' then
+      begin
+        Lobby.FireBoyChoice.Enabled := true;
+        Lobby.WaterGirlChoice.Enabled := true;
+      end;
+      s1 := TStringList.Create;
+      s1.Delimiter := '|';
+      s1.StrictDelimiter := true;
+      s1.DelimitedText := s;
+      if s1[0] = 'info' then Lobby.MapLabel.Caption := 'Map: '+s1[1]
+      else if s1[0] = 'new' then Lobby.PlayersList.Items.Add(s1[1])
+      else if s1[0] = 'exit' then Lobby.PlayersList.Items.Delete(Lobby.PlayersList.Items.IndexOf(s1[2]));
+    End;                }
   until (Terminated);
 end;
 
-procedure IServerSearch.Hide;
-begin
-  ServerIP.Visible := false;
-  ServerInfo.Visible := false;
-  ReturnBtn.Visible := false;
-  GetInfoBtn.Visible := false;
-  ConnectBtn.Visible := false;
-end;
-
+{
 procedure IServerSearch.OnClick(Sender: TObject);
 var
   ping: TPing;
@@ -509,16 +449,7 @@ begin
       End;
     end;
   end;
-end;
-
-procedure IServerSearch.Show;
-begin
-  ServerIP.Visible := true;
-  ServerInfo.Visible := true;
-  ReturnBtn.Visible := true;
-  GetInfoBtn.Visible := true;
-  ConnectBtn.Visible := true;
-end;
+end;   }
 
 procedure TForm1.FormAlignPosition(Sender: TWinControl; Control: TControl;
   var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect;
@@ -530,7 +461,7 @@ begin
   NewWidth := Round(items[Control.Tag].width * (ClientWidth/gamewidth));
   NewHeight := Round(items[Control.Tag].height * (ClientHeight/gameheight));
 
-  if Control.ClassName = 'TBitBtn' then (Control as TBitBtn).Font.Size := Round(items[Control.Tag].font * Min((ClientWidth/1280), (ClientHeight/720)));
+  if Control.ClassName = 'TBitBtn' then (Control as TBitBtn).Font.Height := Min((Control as TBitBtn).Height, (Control as TBitBtn).Width);
 end;
 
 procedure TForm1.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -552,6 +483,11 @@ end;
 
 { IModsFunctions }
 
+function GetMapSettings:PMapSettings;
+Begin
+  //
+End;
+
 function GetActivatedObject(id: Byte): PMapObject;
 begin
   result := @obj[id];
@@ -559,17 +495,37 @@ end;
 
 procedure PlayerKill(playertype: Byte);
 begin
-  players[playertype].img.Left := save.settings.start[0].x;
+  {players[playertype].img.Left := save.settings.start[0].x;
   players[playertype].Left := save.settings.start[0].x;
 
   players[playertype].img.Top := save.settings.start[0].y;
-  players[playertype].Top := save.settings.start[0].y;
+  players[playertype].Top := save.settings.start[0].y; }
 end;
 
 procedure Win;
 begin
   //
 end;
+
+procedure ChangeSpawn(coords: Tpoint; playertype: SmallInt=-1);
+Begin
+  //
+End;
+
+procedure AddAnim(TType: TTAnimType; AType: TAnimType; Id, ms: Word; var start, stop);
+Begin
+  //
+End;
+
+procedure AddMove(AType: TMoveType; id: Word; coords: Tpoint);
+Begin
+  //
+End;
+
+function AddMovePlayer(id: Byte; coords: TPoint): boolean;
+Begin
+  //
+End;
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
@@ -578,6 +534,32 @@ var
   Stngs: ^TSettings;
   bit: TBitmap;
 begin
+  RegisterClass(TLabel);
+  RegisterClass(TListBox);
+  RegisterClass(TCheckBox);
+  RegisterClass(TRadioGroup);
+  RegisterClass(TBitBtn);
+  RegisterClass(TEdit);
+  RegisterClass(TPanel);
+  RegisterClass(TListView);
+  RegisterClass(TMemo);
+
+  CurrentScene := 'MainMenu';
+
+  LoadDFMtoComponent('forms/MainMenu.dfm', Form1);
+  LoadDFMtoComponent('forms/SearchServer.dfm', Form1);
+  LoadDFMtoComponent('forms/Lobby.dfm', Form1);
+  LoadDFMtoComponent('forms/Mods.dfm', Form1);
+
+  (FindComponent('MMPlay') as TBitBtn).OnClick := OnPlayClick;
+  (FindComponent('MMCreateServer') as TBitBtn).OnClick := OnCreateServerClick;
+  (FindComponent('MMMods') as TBitBtn).OnClick := OnModsClick;
+  (FindComponent('MMSettings') as TBitBtn).OnClick := OnSettingsClick;
+  (FindComponent('MMExit') as TBitBtn).OnClick := OnExitClick;
+  (FindComponent('MReturn') as TBitBtn).OnClick := OnReturnToMMClick;
+  (FindComponent('SSReturn') as TBitBtn).OnClick := OnReturnToMMClick;
+  (FindComponent('SSConnect') as TBitBtn).OnClick := OnConnectClick;
+
   ModsFunctions := IModsFunctions.Create;
   ModsFunctions.PlayerKill := @PlayerKill;
   ModsFunctions.Win := @Win;
@@ -586,71 +568,18 @@ begin
   gamewidth := 1280;
   gameheight := 720;
   myobj := TObj.Create;
-  manager.LoadALL('mods', nil, myobj, @GetActivatedObject, @PlayerKill, @Win);
-
-  mods := IMods.Create;
-
-  with Mods do
-  Begin
-    list := TListBox.Create(Form1);
-    list.Parent := Form1;
-    list.Visible := false;
-    list.Left := 500;
-    list.Top := 200;
-    list.Width := 300;
-    list.Height := 400;
-
-    return := TButton.Create(Form1);
-    return.Parent := Form1;
-    return.Visible := false;
-    return.Left := list.Left + list.Width div 2 - return.Width div 2;
-    return.Top := list.Top + list.Height + 6;
-    return.Caption := '¬ÂÌÛÚ¸Òˇ';
-    return.OnClick := OnClick;
-  End;
+  manager.LoadALL('mods', nil, myobj, @GetActivatedObject, @PlayerKill, @Win, @MapSettings);
 
   if myobj.Count > 0 then for i := 0 to myobj.Count - 1 do
   Begin
-    Mods.list.Items.Add(myobj.Name[i]);
-    bit := TBitmap.Create;
+    (FindComponent('MModsList') as TListBox).Items.Add(myobj.Name[i]);
     try
-      bit.Assign(myobj.pic[i]);
       SetLength(img,Length(img)+1);
 
-      img[i].img := TImage.Create(Form1);
-      //img[i].img.Parent := Form1;
-      img[i].img.tag := i;
-      //img[i].img.Anchors := [akLeft,akBottom];
-      {
-      if i = 0 then img[i].img.Left := 0
-      else img[i].img.Left := img[i-1].img.Left + img[i-1].img.Picture.Bitmap.Width;
-      }
-      //if bit.Height > ClientHeight - line.Top then line.Top := ClientHeight - bit.Height;
+      stngs := myobj.Settings[i];
 
-      //img[i].img.Top := ClientHeight - bit.Height;
-      img[i].img.Picture.Bitmap := bit;
-
+      img[i].anim := TAnim.Create(Form1, myobj.GIF[i], stngs.Transparent);
       img[i].Name := myobj.Name[i];
-
-      img[i].img.Picture.Bitmap.TransparentMode := tmFixed;
-      Stngs := myobj.Settings[i];
-      img[i].img.Picture.Bitmap.TransparentColor := Stngs.Transparent;
-      img[i].img.Transparent := true;
-      {
-      if Stngs.animation then
-      Begin
-        test := TImage.Create(form1);
-        test.Parent := form1;
-        test.Canvas.Draw(0,0,myobj.GIF[i].Images.Frames[0].Bitmap);
-        test.Picture.Bitmap.TransparentColor := clBlack;
-        test.Picture.Bitmap.TransparentMode := tmFixed;
-        test.Transparent := true;
-        img[i].img.Canvas.Draw(Stngs.AnimPos.x,Stngs.AnimPos.y,test.Picture.Bitmap);
-        test.Free;
-      End;
-      }
-
-      bit.Free;
     except
 
     end;
@@ -664,253 +593,6 @@ begin
   until FindNext(sr) <> 0;
   FindClose(sr);
 
-  MainMenu := IMainMenu.Create;
-
-  SetLength(items, 14);
-
-  With MainMenu do
-  Begin
-    Btn1 := TBitBtn.Create(Form1);
-    Btn1.Parent := Form1;
-    Btn1.Tag := 1;
-    Btn1.Caption := '»√–¿“‹';
-    items[Btn1.Tag].left :=390;
-    items[Btn1.Tag].top := 280;
-    items[Btn1.Tag].width := 500;
-    items[Btn1.Tag].height := 60;
-    Btn1.Align := alCustom;
-    Btn1.Anchors := [akLeft,akTop,akRight,akBottom];
-    items[Btn1.Tag].font := 24;
-    Btn1.OnClick := OnClick;
-
-    Btn2 := TBitBtn.Create(Form1);
-    Btn2.Parent := Form1;
-    Btn2.Tag := 2;
-    Btn2.Caption := '—Œ«ƒ¿“‹ —≈–¬≈–';
-    items[Btn2.Tag].left := 390;
-    items[Btn2.Tag].top := 400;
-    items[Btn2.Tag].width := 500;
-    items[Btn2.Tag].height := 60;
-    Btn2.Align := alCustom;
-    Btn2.Anchors := [akLeft,akTop,akRight,akBottom];
-    items[Btn2.Tag].font := 24;
-    Btn2.OnClick := OnClick;
-
-    Btn3 := TBitBtn.Create(Form1);
-    Btn3.Parent := Form1;
-    Btn3.Tag := 3;
-    Btn3.Caption := 'ÃŒƒ€';
-    items[Btn3.Tag].left := 390;
-    items[Btn3.Tag].top := 466;
-    items[Btn3.Tag].width := 500;
-    items[Btn3.Tag].height := 60;
-    Btn3.Align := alCustom;
-    Btn3.Anchors := [akLeft,akTop,akRight,akBottom];
-    items[Btn3.Tag].font := 24;
-    Btn3.OnClick := OnClick;
-
-    Btn4 := TBitBtn.Create(Form1);
-    Btn4.Parent := Form1;
-    Btn4.Tag := 4;
-    Btn4.Caption := 'Õ¿—“–Œ… »';
-    items[Btn4.Tag].left := 390;
-    items[Btn4.Tag].top := 532;
-    items[Btn4.Tag].width := 500;
-    items[Btn4.Tag].height := 60;
-    Btn4.Align := alCustom;
-    Btn4.Anchors := [akLeft,akTop,akRight,akBottom];
-    items[Btn4.Tag].font := 24;
-    Btn4.OnClick := OnClick;
-
-    Btn5 := TBitBtn.Create(Form1);
-    Btn5.Parent := Form1;
-    Btn5.Tag := 5;
-    Btn5.Caption := '¬€’Œƒ';
-    items[Btn5.Tag].left := 390;
-    items[Btn5.Tag].top := 598;
-    items[Btn5.Tag].width := 500;
-    items[Btn5.Tag].height := 60;
-    Btn5.Align := alCustom;
-    Btn5.Anchors := [akLeft,akTop,akRight,akBottom];
-    items[Btn5.Tag].font := 24;
-    Btn5.OnClick := OnClick;
-  End;
-
-  SearchServer := IServerSearch.Create;
-
-  with SearchServer do
-  Begin
-    ServerIP := TEdit.Create(Form1);
-    ServerIP.Parent := Form1;
-    ServerIP.Tag := 6;
-    ServerIP.Left := 490;
-    items[ServerIP.Tag].left := ServerIP.Left;
-    ServerIP.Top := 280;
-    items[ServerIP.Tag].top := ServerIP.Top;
-    ServerIP.Width := 300;
-    items[ServerIP.Tag].width := ServerIP.Width;
-    items[ServerIP.Tag].height := ServerIP.Height;
-    ServerIP.Align := alCustom;
-    ServerIP.Anchors := [akLeft,akTop,akRight,akBottom];
-    ServerIP.Visible := false;
-
-    ServerInfo := TListBox.Create(Form1);
-    ServerInfo.Parent := Form1;
-    ServerInfo.Tag := 7;
-    ServerInfo.Left := 490;
-    items[ServerInfo.Tag].left := ServerInfo.Left;
-    ServerInfo.Top := 307;
-    items[ServerInfo.Tag].top := ServerInfo.Top;
-    ServerInfo.Width := 300;
-    items[ServerInfo.Tag].width := ServerInfo.Width;
-    ServerInfo.Height := 200;
-    items[ServerInfo.Tag].height := ServerInfo.Height;
-    ServerInfo.Align := alCustom;
-    ServerInfo.Anchors := [akLeft,akTop,akRight,akBottom];
-    ServerInfo.Visible := false;
-
-    ReturnBtn := TBitBtn.Create(Form1);
-    ReturnBtn.Parent := Form1;
-    ReturnBtn.Tag := 8;
-    ReturnBtn.Left := 490;
-    items[ReturnBtn.Tag].left := ReturnBtn.Left;
-    ReturnBtn.Top := 513;
-    items[ReturnBtn.Tag].top := ReturnBtn.Top;
-    ReturnBtn.Width := 70;
-    items[ReturnBtn.Tag].width := ReturnBtn.Width;
-    items[ReturnBtn.Tag].height := ReturnBtn.Height;
-    ReturnBtn.Align := alCustom;
-    ReturnBtn.Anchors := [akLeft,akTop,akRight,akBottom];
-    ReturnBtn.Font.Size := 6;
-    items[ReturnBtn.Tag].font := ReturnBtn.Font.Size;
-    ReturnBtn.Caption := '¬≈–Õ”“‹—ﬂ';
-    ReturnBtn.OnClick := OnClick;
-    ReturnBtn.Visible := false;
-
-    GetInfoBtn := TBitBtn.Create(Form1);
-    GetInfoBtn.Parent := Form1;
-    GetInfoBtn.Tag := 9;
-    GetInfoBtn.Left := 605;
-    items[GetInfoBtn.Tag].left := GetInfoBtn.Left;
-    GetInfoBtn.Top := 513;
-    items[GetInfoBtn.Tag].top := GetInfoBtn.Top;
-    GetInfoBtn.Width := 70;
-    items[GetInfoBtn.Tag].width := GetInfoBtn.Width;
-    items[GetInfoBtn.Tag].height := GetInfoBtn.Height;
-    GetInfoBtn.Align := alCustom;
-    GetInfoBtn.Anchors := [akLeft,akTop,akRight,akBottom];
-    GetInfoBtn.Font.Size := 6;
-    items[GetInfoBtn.Tag].font := GetInfoBtn.Font.Size;
-    GetInfoBtn.Caption := '»Õ‘Œ–Ã¿÷»ﬂ';
-    GetInfoBtn.OnClick := OnClick;
-    GetInfoBtn.Visible := false;
-
-    ConnectBtn := TBitBtn.Create(Form1);
-    ConnectBtn.Parent := Form1;
-    ConnectBtn.Tag := 10;
-    ConnectBtn.Left := 720;
-    items[ConnectBtn.Tag].left := ConnectBtn.Left;
-    ConnectBtn.Top := 513;
-    items[ConnectBtn.Tag].top := ConnectBtn.Top;
-    ConnectBtn.Width := 70;
-    items[ConnectBtn.Tag].width := ConnectBtn.Width;
-    items[ConnectBtn.Tag].height := ConnectBtn.Height;
-    ConnectBtn.Align := alCustom;
-    ConnectBtn.Anchors := [akLeft,akTop,akRight,akBottom];
-    ConnectBtn.Font.Size := 6;
-    items[ConnectBtn.Tag].font := ConnectBtn.Font.Size;
-    ConnectBtn.Caption := 'œŒƒ Àﬁ◊»“‹—ﬂ';
-    ConnectBtn.OnClick := OnClick;
-    ConnectBtn.Visible := false;
-  End;
-
-  Lobby := ILobby.Create;
-
-  with Lobby do
-  Begin
-    MapLabel := TLabel.Create(Form1);
-    MapLabel.Parent := Form1;
-    MapLabel.Tag := 11;
-    items[MapLabel.Tag].left := 490;   
-    items[MapLabel.Tag].top := 280;
-    items[MapLabel.Tag].width := 300;
-    items[MapLabel.Tag].height := 18;
-    MapLabel.Align := alCustom;
-    MapLabel.Anchors := [akLeft,akTop,akRight,akBottom];
-    MapLabel.Font.Size := 14;
-    MapLabel.Caption := '';
-    MapLabel.OnClick := OnClick;
-    MapLabel.Visible := false;
-
-    PlayersList := TListBox.Create(Form1);
-    PlayersList.Parent := Form1;
-    PlayersList.Tag := 12;
-    items[PlayersList.Tag].left := 490;
-    items[PlayersList.Tag].top := 300;
-    items[PlayersList.Tag].width := 500;
-    items[PlayersList.Tag].height := 300;
-    PlayersList.Align := alCustom;
-    PlayersList.Anchors := [akLeft,akTop,akRight,akBottom];
-    PlayersList.Font.Size := 12;
-    PlayersList.Visible := false;
-
-    ReadyCheckbox := TCheckBox.Create(Form1);
-    ReadyCheckbox.Parent := Form1;
-    ReadyCheckbox.Tag := 13;
-    items[ReadyCheckbox.Tag].left := 490;
-    items[ReadyCheckbox.Tag].top := 606;
-    items[ReadyCheckbox.Tag].width := ReadyCheckbox.Width;
-    items[ReadyCheckbox.Tag].height := ReadyCheckbox.Height;
-    ReadyCheckbox.Caption := '√ÓÚÓ‚';
-    ReadyCheckbox.Align := alCustom;
-    ReadyCheckbox.Anchors := [akLeft,akTop,akRight,akBottom];
-    ReadyCheckbox.Font.Size := 12;
-    ReadyCheckbox.Visible := false; 
-    ReadyCheckbox.OnClick := OnClick;
-
-    FireBoyChoice := TRadioButton.Create(Form1);
-    FireBoyChoice.Parent := Form1;
-    FireBoyChoice.Tag := 14;
-    items[FireBoyChoice.Tag].left := 570;
-    items[FireBoyChoice.Tag].top := 606;
-    items[FireBoyChoice.Tag].width := ReadyCheckbox.Width;
-    items[FireBoyChoice.Tag].height := ReadyCheckbox.Height;
-    FireBoyChoice.Caption := 'Œ„ÓÌ¸';
-    FireBoyChoice.Align := alCustom;
-    FireBoyChoice.Anchors := [akLeft,akTop,akRight,akBottom];
-    FireBoyChoice.Font.Size := 12;
-    FireBoyChoice.Visible := false;
-    FireBoyChoice.OnClick := OnClick;
-
-    WaterGirlChoice := TRadioButton.Create(Form1);
-    WaterGirlChoice.Parent := Form1;
-    WaterGirlChoice.Tag := 15;
-    items[WaterGirlChoice.Tag].left := 650;
-    items[WaterGirlChoice.Tag].top := 606;
-    items[WaterGirlChoice.Tag].width := ReadyCheckbox.Width;
-    items[WaterGirlChoice.Tag].height := ReadyCheckbox.Height;
-    WaterGirlChoice.Caption := '¬Ó‰‡';
-    WaterGirlChoice.Align := alCustom;
-    WaterGirlChoice.Anchors := [akLeft,akTop,akRight,akBottom];
-    WaterGirlChoice.Font.Size := 12;
-    WaterGirlChoice.Visible := false;
-    WaterGirlChoice.OnClick := OnClick;
-
-    Exchange := TRadioButton.Create(Form1);
-    Exchange.Parent := Form1;
-    Exchange.Tag := 16;
-    items[Exchange.Tag].left := 790;
-    items[Exchange.Tag].top := 606;
-    items[Exchange.Tag].width := ReadyCheckbox.Width;
-    items[Exchange.Tag].height := ReadyCheckbox.Height;
-    Exchange.Caption := '¬Ó‰‡';
-    Exchange.Align := alCustom;
-    Exchange.Anchors := [akLeft,akTop,akRight,akBottom];
-    Exchange.Font.Size := 12;
-    Exchange.Visible := false;
-    Exchange.OnClick := OnClick;
-  End;
-
   TCP := TCPClient.create{(OnMsg)};
 end;
 
@@ -918,45 +600,82 @@ procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 begin
   case Key of
-    ord('W'): keys.W := true;
-    ord('A'): keys.A := true;
-    ord('S'): keys.S := true;
-    ord('D'): keys.D := true;
-    ord('E'): keys.E := true;
+    ord('W'): keysPressed.W := true;
+    ord('A'): keysPressed.A := true;
+    ord('S'): keysPressed.S := true;
+    ord('D'): keysPressed.D := true;
+    ord('E'): keysPressed.E := true;
   end;
 end;
 
 procedure TForm1.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
   case Key of
-    ord('W'): keys.W := false;
-    ord('A'): keys.A := false;
-    ord('S'): keys.S := false;
-    ord('D'): keys.D := false;
-    ord('E'): keys.E := false;
+    ord('W'): keysPressed.W := false;
+    ord('A'): keysPressed.A := false;
+    ord('S'): keysPressed.S := false;
+    ord('D'): keysPressed.D := false;
+    ord('E'): keysPressed.E := false;
   end;
+end;
+
+procedure TForm1.OnCreateServerClick(Sender: TObject);
+begin
+  ShellExecute(Form1.Handle, 'open', 'ServerProj.exe', nil, nil, SW_SHOWNORMAL);
+end;
+
+procedure TForm1.OnConnectClick(Sender:TObject);
+var
+  s: TStringList;
+  ping: TPing;
+Begin
+  s := TStringList.Create;
+  s.StrictDelimiter := true;
+  s.Delimiter := ':';
+  s.DelimitedText := (FindComponent('SSAddress') as TEdit).Text;
+  ping := TCP.Connect(s[0], StrToInt(s[1]), maps);
+
+  namemap := ping.map;
+  //inlobby := true;
+  ChangeScene('Lobby');
+  cl1 := TCPThread.Create(false);
+End;
+
+procedure TForm1.OnReturnToMMClick(Sender: TObject);
+Begin
+  ChangeScene('MainMenu');
+End;
+
+procedure TForm1.OnExitClick(Sender: TObject);
+begin
+  Form1.Close;
+end;
+
+procedure TForm1.OnModsClick(Sender: TObject);
+begin
+  ChangeScene('Mods');
+end;
+
+procedure TForm1.OnPlayClick(Sender: TObject);
+begin
+  ChangeScene('SearchServer');
+end;
+
+procedure TForm1.OnSettingsClick(Sender: TObject);
+begin
+  //
 end;
 
 { ILobby }
 
-procedure ILobby.Hide;
+{procedure ILobby.OnClick(Sender: TObject);
 begin
-  MapLabel.Visible := false;
-  PlayersList.Visible := false;
-  ReadyCheckbox.Visible := false;
-  FireBoyChoice.Visible := false;
-  WaterGirlChoice.Visible := false;
-  Exchange.Visible := false;
-end;
-
-procedure ILobby.OnClick(Sender: TObject);
-begin
-  { CheckBox }
+  // CheckBox
   if Sender.ClassName = 'TCheckBox' then
     if (Sender as TCheckBox).Checked then TCP.Send('Ready') else
       if Not (Sender as TCheckBox).Checked then TCP.Send('NotReady');
 
-  { RadioButton }
+  // RadioButton
   if Sender.ClassName = 'TRadioButton' then
     if FireBoyChoice.Checked then
     begin
@@ -974,17 +693,6 @@ begin
           ReadyCheckbox.Checked := false;
           TCP.Send('NotChosen');
         end;
-end;
-
-procedure ILobby.Show;
-begin
-  MapLabel.Visible := true;
-  PlayersList.Visible := true;
-  ReadyCheckbox.Visible := true;
-  ReadyCheckbox.Enabled := false;
-  FireBoyChoice.Visible := true;
-  WaterGirlChoice.Visible := true;
-  Exchange.Visible := true;
-end;
+end;   }
 
 end.

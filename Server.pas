@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, IdCustomTCPServer, IdTCPServer, IdThread,
-  IdBaseComponent, IdComponent, StdCtrls, WinSock, IdIPWatch, IdContext, TFNW;
+  IdBaseComponent, IdComponent, StdCtrls, WinSock, IdIPWatch, IdContext, IdGlobal, TFNW;
 
 type
   TForm1 = class(TForm)
@@ -33,13 +33,10 @@ type
 var
   Form1: TForm1;
   list: TList;
-  settings: record
-    map, name, hash: string;
-    maxplayers: byte;
-  end;
+  settings: TPing;
   players: array of record
-    nick: string;
-    choice: string;
+    nick: string[32];
+    choice: Byte;
     ready: boolean;
   end;
 
@@ -79,8 +76,8 @@ begin
     IdTCPServer1.MaxConnections := settings.maxplayers+1;
     ShowMessage(IntToStr(settings.maxplayers));
     IdTCPServer1.Bindings.Clear;
-    IdTCPServer1.Bindings.Add.SetBinding(Edit1.Text, StrToInt(Edit2.Text));
-    if CheckBox2.Checked then IdTCPServer1.Bindings.Add.SetBinding('127.0.0.1', StrToInt(Edit2.Text));
+    if CheckBox2.Checked then IdTCPServer1.Bindings.Add.SetBinding('127.0.0.1', StrToInt(Edit2.Text))
+    else IdTCPServer1.Bindings.Add.SetBinding('0.0.0.0', StrToInt(Edit2.Text));
     IdTCPServer1.Active := true;
     list := IdTCPServer1.Contexts.LockList;
     IdTCPServer1.Contexts.UnlockList;
@@ -89,20 +86,23 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  Edit1.Text := IdIPWatch1.LocalIP;
+  //Edit1.Text := IdIPWatch1.LocalIP;
   settings.name := 'Test Server';
   list := IdTCPServer1.Contexts.LockList;
   IdTCPServer1.Contexts.UnlockList;
 end;
 
-procedure SendAllBut(AContext: TIdContext; msg: string);
+procedure SendAllBut(AContext: TIdContext; MessageType: TMessageActions; var msg);
 var
   i: byte;
 Begin
   if list.Count = 0 then exit;
   for i := 0 to list.Count-1 do
     if @TIdContext(list.Items[i]).Connection.Socket <> @AContext.Connection.Socket then
-      TIdContext(list.Items[i]).Connection.Socket.WriteLn(msg);
+    Begin
+      TIdContext(list.Items[i]).Connection.Socket.Write(RawToBytes(MessageType, SizeOf(MessageType)));
+      TIdContext(list.Items[i]).Connection.Socket.Write(RawToBytes(msg, SizeOf(msg)));
+    End;
 End;
 
 procedure SendAll(msg: string);
@@ -116,22 +116,51 @@ End;
 
 procedure TForm1.IdTCPServer1Connect(AContext: TIdContext);
 var
-  FS: TFileStream;
+  Buffer: TIdBytes;
+  msg: TMessageActions;
+  MsgPlayerConnected: TPlayerConnectedChangeNick;
+  MsgPlayerChangeType: TPlayerChangeType;
+  MsgPlayerReady: TPlayerReady;
+  i: Byte;
 begin
-  AContext.Connection.Socket.WriteLn(settings.name+'|'+settings.map+'|'+IntToStr(Length(players))+'|'+IntToStr(settings.maxplayers));
-  AContext.Connection.Socket.WriteLn(settings.hash);
-  if AContext.Connection.Socket.ReadLn = 'download' then
+  inc(settings.players);
+  AContext.Connection.Socket.Write(RawToBytes(Settings, SizeOf(Settings)));
+
+  if Length(players) > 0 then
   Begin
-    FS := TFileStream.Create('maps/'+settings.map+'.dat', fmOpenRead);
-    AContext.Connection.Socket.Write(FS,FS.Size,true);
-    FS.Free;
-    FS := TFileStream.Create('maps/'+settings.map+'.dat.settings', fmOpenRead);
-    AContext.Connection.Socket.Write(FS,FS.Size,true);
-    FS.Free;
-  end;
+    for i := 0 to High(players) do
+    Begin
+      msg := PlayerConnected;
+      MsgPlayerConnected.id := i+1;
+      MsgPlayerConnected.nick := players[i].nick;
+      AContext.Connection.Socket.Write(RawToBytes(msg, SizeOf(msg)));
+      AContext.Connection.Socket.Write(RawToBytes(MsgPlayerConnected, SizeOf(MsgPlayerConnected)));
+
+      if players[i].choice >= 0 then
+      Begin
+        msg := PlayerConnected;
+        MsgPlayerChangeType.id := i+1;
+        MsgPlayerChangeType.PlayerType := players[i].choice;
+        AContext.Connection.Socket.Write(RawToBytes(msg, SizeOf(msg)));
+        AContext.Connection.Socket.Write(RawToBytes(MsgPlayerChangeType, SizeOf(MsgPlayerChangeType)));
+      End;
+
+      if players[i].ready then
+      Begin
+        msg := PlayerReady;
+        MsgPlayerReady.id := i+1;
+        MsgPlayerReady.ready := true;
+        AContext.Connection.Socket.Write(RawToBytes(msg, SizeOf(msg)));
+        AContext.Connection.Socket.Write(RawToBytes(MsgPlayerReady, SizeOf(MsgPlayerReady)));
+      End;
+    End;
+  End;
+  AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(MsgPlayerConnected));
+  BytesToRaw(Buffer, MsgPlayerConnected, sizeof(MsgPlayerConnected));
+  SendAllBut(AContext, PlayerConnected, MsgPlayerConnected);
   SetLength(players, Length(players)+1);
-  //players[High(players)].nick := AContext.Connection.Socket.ReadLn;
   players[High(players)].ready := false;
+  players[High(players)].nick := MsgPlayerConnected.nick;
 end;
 
 procedure TForm1.IdTCPServer1Disconnect(AContext: TIdContext);
@@ -146,56 +175,54 @@ end;
 
 procedure TForm1.IdTCPServer1Execute(AContext: TIdContext);
 var
-  s1: TStringList;
-  s: string;
   i: Byte;
-  readys: Byte;
+  FS: TFileStream;
+  Buffer: TIdBytes;
+  msg: TMessageActions;
+  PlayerChangeType: TPlayerChangeType;
+  MsgPlayerReady: TPlayerReady;
+  TxtMessage: TMessage;
+  MsgChangeNick: TPlayerConnectedChangeNick;
 begin
-  s := AContext.Connection.Socket.ReadLn;
-  //ShowMessage(s);
-  if s = 'Ready' then
-  Begin      
-    readys := 0;
-    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
-    players[IndexOf(@AContext.Connection.Socket)].ready := true;
-    for i := 0 to High(players) do if players[i].ready then inc(readys);
-    if readys = settings.maxplayers then SendAll('start');
-    exit;
-  End else
-  if s = 'NotReady' then
-  Begin
-    if IndexOf(@AContext.Connection.Socket) <> -1 then
-      players[IndexOf(@AContext.Connection.Socket)].ready := false;
-    exit;
-  End else
-  if s = 'FireChosen' then
-  Begin
-    readys := 0;
-    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
-    players[IndexOf(@AContext.Connection.Socket)].choice := 'Fire';
-    SendAll('FireChosen');
-    exit;
-  End else
-  if s = 'WaterChosen' then
-  Begin
-    readys := 0;
-    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
-    players[IndexOf(@AContext.Connection.Socket)].choice := 'Water';
-    SendAll('WaterChosen');
-    exit;
-  End else
-  if s = 'NotChosen' then
-  Begin
-    readys := 0;
-    if IndexOf(@AContext.Connection.Socket) = -1 then exit;
-    players[IndexOf(@AContext.Connection.Socket)].choice := '';
-    SendAll('NotChosen');
-    exit;
-  End else SendAllBut(AContext, s);
-  {s1 := TStringList.Create;
-  s1.Delimiter := '|';
-  s1.StrictDelimiter := true;
-  s1.DelimitedText := s; }
+  AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(msg));
+  BytesToRaw(Buffer, msg, sizeof(msg));
+
+  case msg of
+    Ping: AContext.Connection.Socket.Write(RawToBytes(Settings, SizeOf(Settings)));
+    NeedsDownload: Begin
+      FS := TFileStream.Create('maps/'+settings.map+'.dat', fmOpenRead);
+      AContext.Connection.Socket.Write(FS,FS.Size,true);
+      FS.Free;
+      FS := TFileStream.Create('maps/'+settings.map+'.dat.settings', fmOpenRead);
+      AContext.Connection.Socket.Write(FS,FS.Size,true);
+      FS.Free;
+    end;
+    PlayerMove: ;
+    ObjectMove: ;
+    ChangePlayerType: Begin
+      AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(PlayerChangeType));
+      BytesToRaw(Buffer, PlayerChangeType, sizeof(PlayerChangeType));
+      players[IndexOf(@AContext.Connection.Socket)].choice := PlayerChangeType.PlayerType;
+      SendAllBut(AContext, msg, PlayerChangeType);
+    end;
+    TextMessage: Begin
+      AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(TxtMessage));
+      BytesToRaw(Buffer, TxtMessage, sizeof(TxtMessage));
+      SendAllBut(AContext, msg, TxtMessage);
+    end;
+    ChangeNick: Begin
+      AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(MsgChangeNick));
+      BytesToRaw(Buffer, MsgChangeNick, sizeof(MsgChangeNick));
+      players[IndexOf(@AContext.Connection.Socket)].nick := MsgChangeNick.nick;
+      SendAllBut(AContext, msg, MsgChangeNick);
+    end;
+    PlayerReady: Begin
+      AContext.Connection.Socket.ReadBytes(Buffer, SizeOf(MsgPlayerReady));
+      BytesToRaw(Buffer, MsgPlayerReady, sizeof(MsgPlayerReady));
+      players[IndexOf(@AContext.Connection.Socket)].ready := MsgPlayerReady.ready;
+      SendAllBut(AContext, msg, MsgPlayerReady);
+    end;
+  end;
 end;
 
 end.

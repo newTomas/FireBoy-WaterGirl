@@ -1,1 +1,27 @@
-test123
+[
+  {
+    "name": "test1",
+    "data": [
+      {
+        "id": 5,
+        "action": 0,
+        "time": 1968941
+      },
+      {
+        "id": 7,
+        "action": 0,
+        "time": 1968421
+      }
+    ]
+  },
+  {
+    "name": "test2",
+    "data": [
+      {
+        "id": 1,
+        "action": 1,
+        "time": 1897
+      }
+    ]
+  }
+]

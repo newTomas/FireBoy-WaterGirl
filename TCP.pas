@@ -2,7 +2,7 @@ unit TCP;
 
 interface
   uses Dialogs, Classes, IdTCPClient, IdBaseComponent,
-  IdComponent, IdTCPConnection, TypInfo, Controls, SysUtils, TFNW;
+  IdComponent, IdTCPConnection, IdGlobal, TypInfo, Controls, SysUtils, TFNW;
 
 type
   //TonMsg = Procedure(s: string);
@@ -14,7 +14,7 @@ type
     function Connect(IP: String; Port: Word; hashes: TMapsList): TPing;
     function Ping(IP: String; Port: Word): TPing;
     procedure Send(Msg: String);
-    function Read: string;
+    function Read: TIdBytes;
     procedure IdTCPClientConnected(Sender: TObject);
     procedure IdTCPClientDisconnected(Sender: TObject);
     procedure Disconnect;
@@ -66,12 +66,11 @@ begin
     result.map := s[1];
     result.players := StrToInt(s[2]);
     result.maxplayers := StrToInt(s[3]);
-    result.work := true;
     IdTCPClient.Disconnect;
   except
     On e: Exception do
     Begin
-      result.work := false;
+      //result := nil;
       ShowMessage(E.Message);
     End;
   end;
@@ -84,18 +83,18 @@ begin
   IdTCPClient.Socket.WriteLn(Msg);
 end;
 
-function TCPClient.Read: string;
+function TCPClient.Read: TIdBytes;
 Begin
-  result := IdTCPClient.Socket.ReadLn;
+  IdTCPClient.Socket.ReadBytes(result, SizeOf(TMessageActions));
 End;
 
 function TCPClient.Connect(IP: string; Port: Word; hashes: TMapsList): TPing;
 var
-  s: TStringList;
-  FS: TFileStream;
-  hash: string;
+  ping: TPing;
   i: word;
-  f: file;
+  Buffer: TIdBytes;
+  msg: TMessageActions;
+  MsgPlayerConnected: TPlayerConnectedChangeNick;
 begin
   IdTCPClient.Disconnect;
   IdTCPClient.Host := IP;
@@ -103,43 +102,23 @@ begin
   try
     pinging := true;
     IdTCPClient.Connect;
-    s := TStringList.Create;
-    s.StrictDelimiter := true;
-    s.Delimiter := '|';
-    s.DelimitedText := IdTCPClient.Socket.ReadLn;
-    result.name := s[0];
-    result.map := s[1];
-    result.players := StrToInt(s[2]);
-    result.maxplayers := StrToInt(s[3]);
-    result.work := true;
-    hash := IdTCPClient.Socket.ReadLn;
+    IdTCPClient.Socket.ReadBytes(Buffer, SizeOf(ping));
+    BytesToRaw(Buffer, ping, sizeof(ping));
+    MsgPlayerConnected.id := ping.players;
+    MsgPlayerConnected.nick := 'TestNick'+IntToStr(ping.players);
+    IdTCPClient.Socket.Write(RawToBytes(MsgPlayerConnected, SizeOf(MsgPlayerConnected)));
     if length(hashes) > 0 then for I := 0 to High(hashes) do
-      if hashes[i].hash = hash then result.hash := hashes[i].hash;
+      if hashes[i].hash = ping.hash then result.hash := hashes[i].hash;
     if result.hash = '' then
     Begin
-      IdTCPClient.Socket.WriteLn('download');
-      AssignFile(f,'maps/'+result.map+'.dat');
-      Rewrite(f);
-      CloseFile(f);
-      AssignFile(f,'maps/'+result.map+'.dat.settings');
-      Rewrite(f);
-      CloseFile(f);
-      FS := TFileStream.Create('maps/'+result.map+'.dat', fmOpenWrite);
-      FS.Size := -1;
-      IdTCPClient.Socket.ReadStream(FS);
-      FS.Free;
-      FS := TFileStream.Create('maps/'+result.map+'.dat.settings', fmOpenWrite);
-      IdTCPClient.Socket.ReadStream(FS);
-      FS.Free;
-    End else IdTCPClient.Socket.WriteLn('downloaded');
-
-    //Send('Player1');
-    //IdTCPClient.Socket.ReadLn;
+      msg := NeedsDownload;
+      IdTCPClient.Socket.Write(RawToBytes(msg, SizeOf(msg)));
+    End;
   except
     on E : Exception do
     Begin
       ShowMessage(E.Message);
-      result.work := false;
+      //result.work := false;
     End;
   end;
   pinging := false;

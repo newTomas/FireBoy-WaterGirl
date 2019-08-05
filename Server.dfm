@@ -20,6 +20,7 @@ object Form1: TForm1
     Width = 14
     Height = 13
     Caption = 'IP:'
+    Visible = False
   end
   object Label2: TLabel
     Left = 8
@@ -40,23 +41,26 @@ object Form1: TForm1
     Top = 40
     Width = 121
     Height = 21
+    MaxLength = 15
     TabOrder = 0
     Text = '127.0.0.1'
+    Visible = False
   end
   object Edit2: TEdit
     Left = 53
     Top = 59
     Width = 121
     Height = 21
+    MaxLength = 5
     TabOrder = 1
-    Text = '80'
+    Text = '778'
   end
   object CheckBox1: TCheckBox
     Left = 53
     Top = 110
     Width = 97
     Height = 17
-    Caption = 'Active'
+    Caption = #1056#1072#1073#1086#1090#1072#1077#1090
     TabOrder = 2
     OnClick = CheckBox1Click
   end
@@ -65,7 +69,7 @@ object Form1: TForm1
     Top = 87
     Width = 97
     Height = 17
-    Caption = '127.0.0.1'
+    Caption = #1051#1086#1082#1072#1083#1100#1085#1099#1081
     TabOrder = 3
   end
   object Edit3: TEdit

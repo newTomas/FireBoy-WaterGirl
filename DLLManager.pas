@@ -7,12 +7,17 @@ uses
   TFNW;
 
 type
+  modinfo = record
+    path, name: string;
+  end;
+  loadresult = (error, obj, player);
   TDLLManager = class
     function IndexOf(name: string):Word;
-    function Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
-    function LoadJPEG(Handle: THandle):TJPEGImage;
+    function Load(modification: modinfo; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin; MapSettings: PMapSettings): loadresult;
+    //function LoadJPEG(Handle: THandle):TJPEGImage;
     function LoadGIF(Handle: THandle):TGIFImage;
-    function LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
+    function LoadGIFPlayer(Handle: THandle):TPlayerAnimations;
+    function LoadALL(name: string; ListBox: TListBox; myobj: TObj; playerslist: TPlayers; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin; MapSettings: PMapSettings): boolean;
     function UnLoad(name: string; ListBox: TListBox=nil): boolean;
     procedure UnLoadAll(ListBox: TListBox=nil);
     function GetHandle(Index: Word):THandle;
@@ -25,17 +30,22 @@ type
 
 var
   Libs: array of record
-    name: string;
+    Name, path: string;
     Handle: THandle;
     functions: record
-      Init: function(GetActivatedObject, PlayerKill, Win: Pointer): Pointer;
+      Init: function(GetActivatedObject, PlayerKill, Win, MapSettings: Pointer): Pointer;
       onAbove: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
       onBelow: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
       onDistance: procedure(Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
       onInside: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
       onActivate: procedure(ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer);
     end;
-    settings: ^TSettings;
+    Settings: PSettings;
+  end;
+  Players: array of record
+    name, path: string;
+    Handle: THandle;
+    Settings: PSettings;
   end;
   i: Word;
 
@@ -52,7 +62,7 @@ Begin
   end;
 End;
 
-function TDLLManager.Load(name: string; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
+function TDLLManager.Load(modification: modinfo; ListBox: TListBox; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin; MapSettings: PMapSettings): loadresult;
 var
   wideChars: PWideChar;
 Begin
@@ -61,20 +71,17 @@ Begin
   //Чистим процедуры и фнукции от мусора
   @Libs[High(Libs)].functions.Init:=nil;
   {Пытаемся загрузить библиотеку}
-  wideChars := PWideChar(WideString(name));
+  wideChars := PWideChar(WideString(modification.path));
   Libs[High(Libs)].Handle := LoadLibrary(wideChars);
-  //Libs[High(Libs)].Handle := LoadLibrary(PAnsiChar(name));
-  Libs[High(Libs)].name := name;
+  //Libs[High(Libs)].Handle := LoadLibrary(PAnsiChar('mods\'+name));
+  Libs[High(Libs)].name := modification.name;
+  Libs[High(Libs)].path := modification.path;
 
   if Libs[High(Libs)].Handle = 0 then
   Begin
     FreeLibrary(Libs[High(Libs)].Handle);
     SetLength(Libs, Length(Libs)-1);
-    result := false;
-  End else
-  Begin
-    if (ListBox <> nil) then ListBox.Items.Add(name);
-    result := true;
+    result := error;
   End;
 
   if Libs[High(Libs)].Handle <> 0 then
@@ -82,44 +89,61 @@ Begin
     @Libs[High(Libs)].functions.Init := GetProcAddress(Libs[High(Libs)].Handle,'Init');
 
     if @Libs[High(Libs)].functions.Init <> nil then
-      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init(GetActivatedObject, PlayerKill, Win);
+      Libs[High(Libs)].settings := Libs[High(Libs)].functions.Init(GetActivatedObject, PlayerKill, Win, MapSettings);
 
-    if Libs[High(Libs)].settings.onDistance then
-      @Libs[High(Libs)].functions.onDistance := GetProcAddress(Libs[High(Libs)].Handle,'onDistance');
+    if Libs[High(Libs)].settings.isPlayer then
+    Begin
+      SetLength(Players, length(Players)+1);
+      Players[High(Players)].name := Libs[High(Libs)].name;
+      Players[High(Players)].path := Libs[High(Libs)].path;
+      Players[High(Players)].Handle := Libs[High(Libs)].Handle;
+      Players[High(Players)].Settings := Libs[High(Libs)].Settings;
+      SetLength(Libs, Length(Libs)-1);
+      result := player;
+    End else
+    Begin
+      if Libs[High(Libs)].settings.onDistance then
+        @Libs[High(Libs)].functions.onDistance := GetProcAddress(Libs[High(Libs)].Handle,'onDistance');
 
-    if Libs[High(Libs)].settings.onInside then
-      @Libs[High(Libs)].functions.onInside:=GetProcAddress(Libs[High(Libs)].Handle,'onInside');
+      if Libs[High(Libs)].settings.onInside then
+        @Libs[High(Libs)].functions.onInside:=GetProcAddress(Libs[High(Libs)].Handle,'onInside');
 
-    if Libs[High(Libs)].settings.onAbove then
-      @Libs[High(Libs)].functions.onAbove := GetProcAddress(Libs[High(Libs)].Handle,'onAbove');
+      if Libs[High(Libs)].settings.onAbove then
+        @Libs[High(Libs)].functions.onAbove := GetProcAddress(Libs[High(Libs)].Handle,'onAbove');
 
-    if Libs[High(Libs)].settings.onBelow then
-      @Libs[High(Libs)].functions.onBelow := GetProcAddress(Libs[High(Libs)].Handle,'onBelow');
+      if Libs[High(Libs)].settings.onBelow then
+        @Libs[High(Libs)].functions.onBelow := GetProcAddress(Libs[High(Libs)].Handle,'onBelow');
+
+      result := obj;
+    End;
   end;
 End;
 
-function TDLLManager.LoadJPEG(Handle: THandle):TJPEGImage;
-var
-  RS: TResourceStream;
+function TDLLManager.LoadGIF(Handle: THandle):TGIFImage;
 Begin
-  result := TJPEGImage.Create;
-  RS := TResourceStream.Create(Handle, 'PIC', RT_RCDATA);
-  result.LoadFromStream(RS);
+  result := TGIFImage.Create;
+  result.LoadFromStream(TResourceStream.Create(Handle, 'GIF', RT_RCDATA));
 End;
 
-function TDLLManager.LoadGIF(Handle: THandle):TGIFImage;
-var
-  RS: TResourceStream;
+function TDLLManager.LoadGIFPlayer(Handle: THandle):TPlayerAnimations;
 Begin
-  result := nil;
-  exit;
-  if not Libs[High(Libs)].settings.animation then result := nil
-  else Begin
-    result := TGIFImage.Create;
-    RS := TResourceStream.Create(Handle, 'GIF', RT_RCDATA);
-    result.LoadFromStream(RS);
-  End;
-End;
+  result.up := TGIFImage.Create;
+  result.up.LoadFromStream(TResourceStream.Create(Handle, 'up', RT_RCDATA));
+  result.down := TGIFImage.Create;
+  result.down.LoadFromStream(TResourceStream.Create(Handle, 'down', RT_RCDATA));
+  result.left := TGIFImage.Create;
+  result.left.LoadFromStream(TResourceStream.Create(Handle, 'left', RT_RCDATA));
+  result.right := TGIFImage.Create;
+  result.right.LoadFromStream(TResourceStream.Create(Handle, 'right', RT_RCDATA));
+  result.stand := TGIFImage.Create;
+  result.stand.LoadFromStream(TResourceStream.Create(Handle, 'stand', RT_RCDATA));
+  result.sit := TGIFImage.Create;
+  result.sit.LoadFromStream(TResourceStream.Create(Handle, 'sit', RT_RCDATA));
+  result.rightfast := TGIFImage.Create;
+  result.rightfast.LoadFromStream(TResourceStream.Create(Handle, 'rightfast', RT_RCDATA));
+  result.leftfast := TGIFImage.Create;
+  result.leftfast.LoadFromStream(TResourceStream.Create(Handle, 'leftfast', RT_RCDATA));
+end;
 
 function TDLLManager.Run(name: string; on: string; Dist: Word; ObjectId,ActivatedId,PlayerType: Byte; Player: PPlayer): boolean;
 begin
@@ -137,22 +161,23 @@ begin
   else result := false;
 end;
 
-function TDLLManager.LoadALL(name: string; ListBox: TListBox; myobj: TObj; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin): boolean;
+function TDLLManager.LoadALL(name: string; ListBox: TListBox; myobj: TObj; playerslist: TPlayers; GetActivatedObject: PGetActivatedObject; PlayerKill: PPlayerKill; Win: PWin; MapSettings: PMapSettings): boolean;
 var
-  sr: TSearchRec;
-  SL: TStringList;
+  search: TSearchRec;
+  info: modinfo;
 Begin
-  if FindFirst(name + '\*.dll',faAnyFile,sr) = 0 then
+  if FindFirst(name + '\*.dll',faAnyFile,search) = 0 then
     repeat
-      SL := TStringList.Create;
-      SL.Delimiter := '.';
-      SL.DelimitedText := sr.Name;
-      if Load(name + '\' + sr.Name, ListBox, GetActivatedObject, PlayerKill, Win) and (myobj <> nil) then
-      Begin
-        myobj.Add(LoadJPEG(Libs[High(Libs)].Handle), SL[0], Libs[High(Libs)].Settings, LoadGIF(Libs[High(Libs)].Handle));
-      End;
-    until FindNext(sr) <> 0;
-  FindClose(sr);
+      info.name := copy(search.Name, 0, Length(search.Name)-4);
+      info.path := 'mods\'+search.Name;
+      case Load(info, ListBox, GetActivatedObject, PlayerKill, Win, MapSettings) of
+        player: if myobj <> nil then
+          playerslist.Add(info.name, Players[High(Players)].Settings, LoadGIFPlayer(Players[High(Players)].Handle));
+        obj: if myobj <> nil then
+          myobj.Add(info.name, Libs[High(Libs)].Settings, LoadGIF(Libs[High(Libs)].Handle));
+      end;
+    until FindNext(search) <> 0;
+  FindClose(search);
   result := true;
 End;
 

@@ -5,8 +5,8 @@ object Form1: TForm1
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsNone
   Caption = #1041#1077#1079#1099#1084#1103#1085#1085#1099#1081' - FireBoy & WaterGirl map edit'
-  ClientHeight = 759
-  ClientWidth = 1296
+  ClientHeight = 720
+  ClientWidth = 1280
   Color = clBtnFace
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET

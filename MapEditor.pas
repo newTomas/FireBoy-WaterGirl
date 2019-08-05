@@ -6,7 +6,7 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, StdCtrls, FileCtrl, Menus,
   ComCtrls, TFNW, ImgList, ExtCtrls, Math,
-  Jpeg, GIFImg, DLLManager;
+  Jpeg, GIFImg, DLLManager, Vcl.JumpList, JSON, IOUtils;
 
 type
   TForm1 = class(TForm)
@@ -19,7 +19,6 @@ type
     N6: TMenuItem;
     background: TImage;
     Timer1: TTimer;
-    procedure Button2Click(Sender: TObject);
     procedure N2Click(Sender: TObject);
     procedure N3Click(Sender: TObject);
     procedure N4Click(Sender: TObject);
@@ -51,7 +50,6 @@ type
     procedure FormMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure setformclose(Sender: TObject; var CanClose: Boolean);
-    procedure SaveBtn(Sender: TObject);
     procedure FormAlignPosition(Sender: TWinControl; Control: TControl;
       var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect;
       AlignInfo: TAlignInfo);
@@ -67,11 +65,15 @@ const
 
 var
   Form1: TForm1;
-  Form2: TForm;
-  FormPanel: TForm;
+  SettingsForm: TForm;
+  ObjectActionFrom: TForm;
+  ObjectsPanel: TForm;
+  PlayersPanel: TForm;
   myobj: TObj;
+  playerslist: TPlayers;
   settings: record
-    width, height, players: TEdit;
+    cbox: TComboBox;
+    {width, height, players,} selectid: TEdit;
     start: record
       x,y: TEdit;
     end;
@@ -81,33 +83,45 @@ var
   manager: TDLLManager;
   mapname: string;
   save: record
-    objs: array of Tmap;
+    high: Word;
+    objs: array[1..65535] of Tmap;
     settings: TSettingsMap;
   end;
-  F1: File of TSettingsMap;
-  F2: File of Tmap;
+  //F1: File of TSettingsMap;
+  F2: TextFile;
   saved: boolean=true;
   fullscreen: boolean=false;
   img: record
+    high: Word;
     x,y: Word;
     down: boolean;
-    arr: array of record
+    arr: array[1..65535] of record
+      img: TImage;
+      name: string[32];
+    end;
+  end;
+  Players: record
+    high: Word;
+    x,y: Word;
+    down: boolean;
+    arr: array[1..255] of record
       img: TImage;
       name: string[32];
     end;
   end;
   obj: record
-    activate: Integer;
+    high: Word;
+    activate: Word;
     x,y: Word;
     Width, Height: Word;
     down: boolean;
     moved: boolean;
-    arr: array of record
+    arr: array[1..65535] of record
       img: TImage;
       width, height: Word;
       selected: boolean;
       name: string[32];
-      activate: Integer;
+      data: array of TObjectData;
     end;
   end;
   select: record
@@ -124,7 +138,7 @@ procedure deselect;
 var
   i: Word;
 Begin
-  for i := 0 to High(obj.arr) do
+  for i := 0 to obj.high do
     obj.arr[i].selected := false;
 End;
 
@@ -147,34 +161,30 @@ begin
     obj.moved := true;
     if (obj.x/obj.Width >= 0.8) and (obj.y/obj.Height >= 0.8) then
     Begin
+      Screen.Cursor := crSizeNWSE;
       obj.arr[(Sender as TImage).Tag].Width := obj.Width + x - obj.x;
       obj.arr[(Sender as TImage).Tag].Height := obj.Height + y - obj.y;
       (Sender as TImage).Top := (Sender as TImage).Top-1;  
       (Sender as TImage).Top := (Sender as TImage).Top+1;
     End else
     Begin
+      Screen.Cursor := crSizeAll;
       if obj.arr[(Sender as TImage).Tag].selected then
       Begin
-        if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do if obj.arr[i].selected then
-        Begin
+        if obj.high >= 1 then for i := 1 to obj.high do if obj.arr[i].selected then
           if ssShift in Shift then
-            obj.arr[i].img.Left := RoundUp(obj.arr[i].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-          else obj.arr[i].img.Left := obj.arr[i].img.Left + x - obj.x;
-          if ssShift in Shift then
-            obj.arr[i].img.Top := RoundUp(obj.arr[i].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-          else obj.arr[i].img.Top := obj.arr[i].img.Top + y - obj.y;
-        End;
+          Begin
+            obj.arr[i].img.Left := RoundUp(obj.arr[i].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+            obj.arr[i].img.Top := RoundUp(obj.arr[i].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+          End else
+          Begin
+            obj.arr[i].img.Left := obj.arr[i].img.Left + x - obj.x;
+            obj.arr[i].img.Top := obj.arr[i].img.Top + y - obj.y;
+          End;
       End else
       Begin
         deselect;
         obj.arr[(Sender as TImage).Tag].selected := true;
-        if ssShift in Shift then
-          obj.arr[(Sender as TImage).Tag].img.Left := RoundUp(obj.arr[(Sender as TImage).Tag].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-        else obj.arr[(Sender as TImage).Tag].img.Left := obj.arr[(Sender as TImage).Tag].img.Left + x - obj.x;
-
-        if ssShift in Shift then
-          obj.arr[(Sender as TImage).Tag].img.Top := RoundUp(obj.arr[(Sender as TImage).Tag].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-        else obj.arr[(Sender as TImage).Tag].img.Top := obj.arr[(Sender as TImage).Tag].img.Top + y - obj.y;
       End;
     End;
     Form1.Repaint;
@@ -184,28 +194,40 @@ End;
 procedure TForm1.od(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
 var
   Stngs: ^TSettings;
+  i: Word;
 Begin
   if Button = mbRight then
   Begin
-    if obj.activate = -1 then
+    obj.activate := (Sender as TImage).Tag;
+    ObjectActionFrom.Show;
+    (ObjectActionFrom.FindComponent('ActionControlGroup') as TGroupBox).Enabled := false;
+    (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex := 0;
+    (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items.Clear;
+    if Length(obj.arr[obj.activate].data) > 0 then for i := 0 to High(obj.arr[obj.activate].data) do
     Begin
-      stngs := myobj.Settings[manager.IndexOf('mods\'+obj.arr[(Sender as TImage).Tag].name+'.dll')];
-      if stngs.onActivate then obj.activate := (Sender as TImage).Tag;
-    End
-    else Begin
-      if obj.arr[obj.activate].activate = (Sender as TImage).Tag then obj.arr[obj.activate].activate := -1
-      else if obj.activate <> (Sender as TImage).Tag then obj.arr[obj.activate].activate := (Sender as TImage).Tag;
-      obj.activate := -1;
+      (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items.Add;
+      (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems.Add(IntToStr(obj.arr[obj.activate].data[i].id));
+      (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems.Add(IntToStr(obj.arr[obj.activate].data[i].coords.x));
+      (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems.Add(IntToStr(obj.arr[obj.activate].data[i].coords.y));
+      case obj.arr[obj.activate].data[i].ActionType of
+        MoveObject: (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption := 'Переместить объект';
+        MovePlayer: (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption := 'Переместить игрока';
+        KillPlayer: (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption := 'Убить игрока';
+        ChangeSpawn: (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption := 'Изменить спавн';
+      end;
     End;
   End else
   Begin
-    obj.x := x;
-    obj.y := y;
-    obj.Width := (Sender as TImage).Width;
-    obj.Height := (Sender as TImage).Height;
-    obj.down := true;
-    obj.moved := false;
-    saved := false;
+    if obj.activate > 0 then (ObjectActionFrom.FindComponent('id') as TEdit).Text := IntToStr((Sender as TImage).Tag) else
+    Begin
+      obj.x := x;
+      obj.y := y;
+      obj.Width := (Sender as TImage).Width;
+      obj.Height := (Sender as TImage).Height;
+      obj.down := true;
+      obj.moved := false;
+      saved := false;
+    End;
   End;
 End;
 
@@ -215,13 +237,14 @@ var
   i: Word;
 Begin
   selected := 0;
+  Screen.Cursor := crArrow;
   //if (Sender as TImage).Top > line.Top then Remove((Sender as TImage).Tag);
   obj.down := false;
   if not (ssCtrl in Shift) and (not obj.moved) then deselect;
   if not obj.moved then obj.arr[(Sender as TImage).Tag].selected := true;
   if obj.moved then
   Begin
-    for i := 0 to High(obj.arr) do if obj.arr[i].selected then inc(selected);
+    for i := 1 to obj.high do if obj.arr[i].selected then inc(selected);
     if selected = 1 then obj.arr[(Sender as TImage).Tag].selected := False;
   End;
 
@@ -232,11 +255,18 @@ procedure TForm1.mv(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer)
 Begin
   if img.down then
   Begin
-    if ssShift in Shift then (Sender as TImage).Left := RoundUp((Sender as TImage).Left + x - img.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-    else (Sender as TImage).Left := (Sender as TImage).Left + x - img.x;
-
-    if ssShift in Shift then (Sender as TImage).Top := RoundUp((Sender as TImage).Top + y - img.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4)
-    else (Sender as TImage).Top := (Sender as TImage).Top + y - img.y;
+    if ssShift in Shift then
+    Begin
+      (Sender as TImage).Left := RoundUp((Sender as TImage).Left + x - img.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+      (Sender as TImage).Top := RoundUp((Sender as TImage).Top + y - img.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+    end else
+    Begin
+      (Sender as TImage).Left := (Sender as TImage).Left + x - img.x;
+      (Sender as TImage).Top := (Sender as TImage).Top + y - img.y;
+    End;
+    if ((Sender as TImage).Top < 0) or ((Sender as TImage).Top > ObjectsPanel.Height) or ((Sender as TImage).Left < 0) or ((Sender as TImage).Left > ObjectsPanel.Width) then
+      Screen.Cursor := crDrag
+    else Screen.Cursor := crArrow;
   End;
 End;
 
@@ -252,103 +282,152 @@ procedure TForm1.mu(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X
 var
   RS: TResourceStream;
 Begin
-  if ((Sender as TImage).Top < 0) or ((Sender as TImage).Top > FormPanel.Height) or ((Sender as TImage).Left < 0) or ((Sender as TImage).Left > FormPanel.Width) then
+  Screen.Cursor := crArrow;
+  if ((Sender as TImage).Top < 0) or ((Sender as TImage).Top > ObjectsPanel.Height) or ((Sender as TImage).Left < 0) or ((Sender as TImage).Left > ObjectsPanel.Width) then
   Begin
-    SetLength(obj.arr, Length(obj.arr)+1);
-    obj.arr[High(obj.arr)].name := img.arr[(Sender as TImage).Tag].name;
-    obj.arr[High(obj.arr)].img := TImage.Create(Form1);
-    obj.arr[High(obj.arr)].img.Parent := Form1;
-    obj.arr[High(obj.arr)].img.Picture.Bitmap := (Sender as TImage).Picture.Bitmap;
-    obj.arr[High(obj.arr)].img.Left := (Sender as TImage).Left + FormPanel.Left;
-    obj.arr[High(obj.arr)].img.Top := (Sender as TImage).Top + FormPanel.Top + (FormPanel.Height - FormPanel.ClientHeight);
-    obj.arr[High(obj.arr)].img.Width := obj.arr[High(obj.arr)].img.Picture.Bitmap.Width;
-    obj.arr[High(obj.arr)].img.Height := obj.arr[High(obj.arr)].img.Picture.Bitmap.Height;
-    obj.arr[High(obj.arr)].width := obj.arr[High(obj.arr)].img.Width;
-    obj.arr[High(obj.arr)].height := obj.arr[High(obj.arr)].img.Height;
-    obj.arr[High(obj.arr)].activate := -1;
+    inc(obj.high);
+    obj.arr[obj.high].name := img.arr[(Sender as TImage).Tag].name;
+    obj.arr[obj.high].img := TImage.Create(Form1);
+    obj.arr[obj.high].img.Parent := Form1;
+    obj.arr[obj.high].img.Picture.Bitmap := (Sender as TImage).Picture.Bitmap;
+    obj.arr[obj.high].img.Left := (Sender as TImage).Left + ObjectsPanel.Left;
+    obj.arr[obj.high].img.Top := (Sender as TImage).Top + ObjectsPanel.Top + (ObjectsPanel.Height - ObjectsPanel.ClientHeight);
+    obj.arr[obj.high].img.Width := obj.arr[obj.high].img.Picture.Bitmap.Width;
+    obj.arr[obj.high].img.Height := obj.arr[obj.high].img.Picture.Bitmap.Height;
+    obj.arr[obj.high].width := obj.arr[obj.high].img.Width;
+    obj.arr[obj.high].height := obj.arr[obj.high].img.Height;
 
-    obj.arr[High(obj.arr)].img.tag := High(obj.arr);
+    obj.arr[obj.high].img.tag := obj.high;
 
-    obj.arr[High(obj.arr)].img.Align := alCustom;
-    obj.arr[High(obj.arr)].img.Stretch := true;
-    obj.arr[High(obj.arr)].img.Picture.Bitmap.TransparentMode := tmFixed;
-    obj.arr[High(obj.arr)].img.Picture.Bitmap.TransparentColor := (Sender as TImage).Picture.Bitmap.TransparentColor;
-    obj.arr[High(obj.arr)].img.Transparent := true;
+    obj.arr[obj.high].img.Align := alCustom;
+    obj.arr[obj.high].img.Stretch := true;
+    obj.arr[obj.high].img.Picture.Bitmap.TransparentMode := tmFixed;
+    obj.arr[obj.high].img.Picture.Bitmap.TransparentColor := (Sender as TImage).Picture.Bitmap.TransparentColor;
+    obj.arr[obj.high].img.Transparent := true;
 
-    obj.arr[High(obj.arr)].img.OnMouseDown := od;
-    obj.arr[High(obj.arr)].img.OnMouseUp := ou;
-    obj.arr[High(obj.arr)].img.OnMouseMove := ov;
+    obj.arr[obj.high].img.OnMouseDown := od;
+    obj.arr[obj.high].img.OnMouseUp := ou;
+    obj.arr[obj.high].img.OnMouseMove := ov;
   end;
   (Sender as TImage).Top := 0;
-  if (Sender as TImage).tag = 0 then (Sender as TImage).Left := 0
+  if (Sender as TImage).tag = 1 then (Sender as TImage).Left := 0
   else (Sender as TImage).Left := img.arr[(Sender as TImage).tag - 1].img.Left + img.arr[(Sender as TImage).tag - 1].img.Picture.Bitmap.Width;
   img.down := false;
 End;
 
 function TForm1.LoadMap: boolean;
 var
-  i: Word;
+  i, j, k: Word;
+  json: TJSONArray;
+  jsonobj: TJSONObject;
+  jsondataarr: TJSONArray;
+  jsondata: TJSONObject;
 begin
-  AssignFile(F2, mapname);
-  Reset(F2);
-  //SetLength(mapname,0);
-  SetLength(Obj.arr,0);
-  SetLength(save.objs,0);
-  while not Eof(F2) do
+  obj.high := 0;
+  json := TJSONObject.ParseJSONValue(TFile.ReadAllText(mapname)) as TJSONArray;
+  if json.Count > 0 then for i := 0 to json.Count - 1 do
   Begin
-    SetLength(save.objs,Length(save.objs)+1);
-    Read(F2,save.objs[High(save.objs)]);
-    SetLength(Obj.arr,Length(Obj.arr)+1);
-    obj.arr[High(Obj.arr)].width := save.objs[High(save.objs)].width;
-    obj.arr[High(Obj.arr)].height := save.objs[High(save.objs)].height;
-    obj.arr[High(Obj.arr)].img := TImage.Create(Form1);
-    obj.arr[High(Obj.arr)].img.Parent := Form1;
-    obj.arr[High(Obj.arr)].activate := save.objs[High(save.objs)].activate;
-    if Length(img.arr) > 0 then
+    inc(obj.high);
+    if img.high > 0 then for j := 1 to img.high do if img.arr[j].name = json.Items[i].FindValue('name').Value then
     Begin
-      for i := 0 to High(img.arr) do if img.arr[i].name = save.objs[High(save.objs)].name then
-      Begin
-        Obj.arr[High(Obj.arr)].img.Picture.Bitmap := img.arr[i].img.Picture.Bitmap;
-        Obj.arr[High(Obj.arr)].name := save.objs[High(save.objs)].name;
-        Obj.arr[High(Obj.arr)].img.Tag := High(Obj.arr);
-        Obj.arr[High(Obj.arr)].img.Width := Obj.arr[High(Obj.arr)].img.Picture.Bitmap.Width;
-        Obj.arr[High(Obj.arr)].img.Height := Obj.arr[High(Obj.arr)].img.Picture.Bitmap.Height;
-        obj.arr[High(obj.arr)].img.Align := alCustom;
-        obj.arr[High(obj.arr)].img.Stretch := true;
-        obj.arr[High(obj.arr)].img.Picture.Bitmap.TransparentMode := tmFixed;
-        obj.arr[High(obj.arr)].img.Picture.Bitmap.TransparentColor := img.arr[i].img.Picture.Bitmap.TransparentColor;
-        obj.arr[High(obj.arr)].img.Transparent := true;
-        Obj.arr[High(Obj.arr)].img.Left := save.objs[High(save.objs)].x;
-        Obj.arr[High(Obj.arr)].img.Top := save.objs[High(save.objs)].y;
+      obj.arr[obj.high].width := StrToInt(json.Items[i].FindValue('width').Value);
+      obj.arr[obj.high].height := StrToInt(json.Items[i].FindValue('height').Value);
+      obj.arr[obj.high].name := json.Items[i].FindValue('name').Value;
+      obj.arr[obj.high].img := TImage.Create(Form1);
+      obj.arr[obj.high].img.Parent := Form1;
+      Obj.arr[obj.high].img.Tag := obj.high;
+      Obj.arr[obj.high].img.Width := Obj.arr[obj.high].img.Picture.Bitmap.Width;
+      Obj.arr[obj.high].img.Height := Obj.arr[obj.high].img.Picture.Bitmap.Height;
+      obj.arr[obj.high].img.Align := alCustom;
+      obj.arr[obj.high].img.Stretch := true;
+      obj.arr[obj.high].img.Picture.Bitmap := img.arr[j].img.Picture.Bitmap;
+      obj.arr[obj.high].img.Picture.Bitmap.TransparentMode := tmFixed;
+      obj.arr[obj.high].img.Picture.Bitmap.TransparentColor := img.arr[j].img.Picture.Bitmap.TransparentColor;
+      obj.arr[obj.high].img.Transparent := true;
+      Obj.arr[obj.high].img.Left := StrToInt(json.Items[i].FindValue('x').Value);
+      Obj.arr[obj.high].img.Top := StrToInt(json.Items[i].FindValue('y').Value);
 
-        Obj.arr[High(Obj.arr)].img.OnMouseDown := od;
-        Obj.arr[High(Obj.arr)].img.OnMouseUp := ou;
-        Obj.arr[High(Obj.arr)].img.OnMouseMove := ov;
+      Obj.arr[obj.high].img.OnMouseDown := od;
+      Obj.arr[obj.high].img.OnMouseUp := ou;
+      Obj.arr[obj.high].img.OnMouseMove := ov;
 
-        break;
-      End;
-      if Obj.arr[High(Obj.arr)].name = '' then
+      SetLength(obj.arr[obj.high].data, (json.Items[i].FindValue('data') as TJSONArray).Count);
+
+      if Length(obj.arr[obj.high].data) > 0 then for k := 0 to High(obj.arr[obj.high].data) do
       Begin
-        ShowMessage('DLL '+save.objs[High(save.objs)].name+'.dll not found.');
-        SetLength(save.objs,Length(save.objs)-1);
-        SetLength(Obj.arr,Length(Obj.arr)-1);
+        obj.arr[obj.high].data[k].ActionType := TObjectActions(StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('ActionType').Value));
+        obj.arr[obj.high].data[k].id := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('id').Value);
+        obj.arr[obj.high].data[k].coords.X := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('x').Value);
+        obj.arr[obj.high].data[k].coords.Y := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('y').Value);
       End;
+
+      break;
+    End;
+    if Obj.arr[obj.high].name = '' then
+    Begin
+      ShowMessage('DLL '+json.Items[i].FindValue('name').Value+'.dll not found.');
+      dec(obj.high);
     End;
   End;
 
-  CloseFile(F2);
-  AssignFile(F1, mapname+'.settings');
+  {while not Eof(F2) do
+  Begin
+    inc(save.high);
+    Read(F2,save.objs[save.high]);
+    inc(obj.high);
+    obj.arr[obj.high].width := save.objs[obj.high].width;
+    obj.arr[obj.high].height := save.objs[obj.high].height;
+    obj.arr[obj.high].img := TImage.Create(Form1);
+    obj.arr[obj.high].img.Parent := Form1;
+    //obj.arr[obj.high].data := save.objs[obj.high].data;
+    if Length(img.arr) > 0 then
+    Begin
+      for i := 1 to img.high do if img.arr[i].name = save.objs[save.high].name then
+      Begin
+        Obj.arr[obj.high].img.Picture.Bitmap := img.arr[i].img.Picture.Bitmap;
+        Obj.arr[obj.high].name := save.objs[save.high].name;
+        Obj.arr[obj.high].img.Tag := obj.high;
+        Obj.arr[obj.high].img.Width := Obj.arr[obj.high].img.Picture.Bitmap.Width;
+        Obj.arr[obj.high].img.Height := Obj.arr[obj.high].img.Picture.Bitmap.Height;
+        obj.arr[obj.high].img.Align := alCustom;
+        obj.arr[obj.high].img.Stretch := true;
+        obj.arr[obj.high].img.Picture.Bitmap.TransparentMode := tmFixed;
+        obj.arr[obj.high].img.Picture.Bitmap.TransparentColor := img.arr[i].img.Picture.Bitmap.TransparentColor;
+        obj.arr[obj.high].img.Transparent := true;
+        Obj.arr[obj.high].img.Left := save.objs[save.high].x;
+        Obj.arr[obj.high].img.Top := save.objs[save.high].y;
+
+        Obj.arr[obj.high].img.OnMouseDown := od;
+        Obj.arr[obj.high].img.OnMouseUp := ou;
+        Obj.arr[obj.high].img.OnMouseMove := ov;
+
+        break;
+      End;
+      if Obj.arr[obj.high].name = '' then
+      Begin
+        ShowMessage('DLL '+save.objs[save.high].name+'.dll not found.');
+        dec(save.high);
+        dec(obj.high);
+      End;
+    End;
+  End; }
+
+  {AssignFile(F1, mapname+'.settings');
   Reset(F1);
   Read(F1,save.settings);
   Width := save.settings.width;
-  Height := save.settings.height;
+  Height := save.settings.height; }
   result := true;
 End;
 
 function TForm1.SaveMap:boolean;
 var
-  i: Word;
+  i, j: Word;
   SaveDialog: TSaveDialog;
+  json: TJSONArray;
+  jsonobj: TJSONObject;
+  jsondataarr: TJSONArray;
+  jsondata: TJSONObject;
 Begin
   result := false;
   SaveDialog := TSaveDialog.Create(self);
@@ -358,30 +437,131 @@ Begin
   Begin
     mapname := SaveDialog.FileName;
     Caption := mapname + ' - ' + gamename;
-    AssignFile(F1, mapname+'.settings');
+    {AssignFile(F1, mapname+'.settings');
     Rewrite(F1);
     Write(F1, save.settings);
-    CloseFile(F1);
+    CloseFile(F1);}
 
-    AssignFile(F2, mapname);
-    Rewrite(F2);
+    json := TJSONArray.Create;
 
-    if length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
+    if obj.high > 1 then for i := 1 to obj.high do
     Begin
-      SetLength(save.objs, Length(save.objs)+1);
-      save.objs[i].x := obj.arr[i].img.Left;
-      save.objs[i].y := obj.arr[i].img.Top;
-      save.objs[i].width := obj.arr[i].width;
-      save.objs[i].height := obj.arr[i].height;
-      save.objs[i].name := obj.arr[i].name;
-      save.objs[i].activate := obj.arr[i].activate;
-      Write(F2, save.objs[i]);
+      json.AddElement(TJSONObject.Create);
+      jsonobj := json.Items[pred(json.Count)] as TJSONObject;
+
+      jsondataarr := TJSONArray.Create;
+      if Length(obj.arr[i].data) > 0 then
+      Begin
+        for j := 0 to High(obj.arr[i].data) do
+        Begin
+          jsondataarr.AddElement(TJSONObject.Create);
+          jsondata := jsondataarr.Items[pred(jsondataarr.Count)] as TJSONObject;
+
+          jsondata.AddPair('ActionType', TJSONNumber.Create(Word(obj.arr[i].data[j].ActionType)))
+            .AddPair('id', TJSONNumber.Create(obj.arr[i].data[j].id))
+            .AddPair('x', TJSONNumber.Create(obj.arr[i].data[j].coords.X))
+            .AddPair('y', TJSONNumber.Create(obj.arr[i].data[j].coords.Y));
+        End;
+      End;
+
+      jsonobj.AddPair('x', TJSONNumber.Create(obj.arr[i].img.Left))
+        .AddPair('y', TJSONNumber.Create(obj.arr[i].img.Top))
+        .AddPair('width', TJSONNumber.Create(obj.arr[i].width))
+        .AddPair('height', TJSONNumber.Create(obj.arr[i].height))
+        .AddPair('name', obj.arr[i].name)
+        .AddPair('data', jsondataarr);
     End;
 
-    CloseFile(F2);
+    TFile.WriteAllText(mapname, json.Format(2));
+
     saved := true;
     result := true;
   End;
+End;
+
+procedure ApplyObjectActions(Sender: TObject);
+var
+  i: Word;
+begin
+  if (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items.Count > 0 then
+  Begin
+    SetLength(obj.arr[obj.activate].data, (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items.Count);
+    for i := 0 to (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items.Count - 1 do
+    Begin
+      if (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption = 'Переместить объект' then obj.arr[obj.activate].data[i].ActionType := MoveObject
+      else if (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption = 'Переместить игрока' then obj.arr[obj.activate].data[i].ActionType := MovePlayer
+      else if (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption = 'Убить игрока' then obj.arr[obj.activate].data[i].ActionType := KillPlayer
+      else if (ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].Caption = 'Изменить спавн' then obj.arr[obj.activate].data[i].ActionType := ChangeSpawn;
+
+      obj.arr[obj.activate].data[i].id := StrToInt((ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems[0]);
+      obj.arr[obj.activate].data[i].coords.X := StrToInt((ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems[1]);
+      obj.arr[obj.activate].data[i].coords.Y := StrToInt((ObjectActionFrom.FindComponent('ActionsList') as TListView).Items[i].SubItems[2]);
+    End;
+  End;
+
+end;
+
+procedure CreateObjectAction(Sender: TObject);
+var
+  ActionsList: TListView;
+Begin
+  ActionsList := (ObjectActionFrom.FindComponent('ActionsList') as TListView);
+  ActionsList.Items.Add;
+  ActionsList.Items[ActionsList.Items.Count - 1].Caption := 'Переместить объект';
+  ActionsList.Items[ActionsList.Items.Count - 1].SubItems.Add('0');
+  ActionsList.Items[ActionsList.Items.Count - 1].SubItems.Add('0');
+  ActionsList.Items[ActionsList.Items.Count - 1].SubItems.Add('0');
+End;
+
+procedure DeleteObjectAction(Sender: TObject);
+Begin
+  (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.Delete;
+End;
+
+procedure SelectObjectAction(Sender: TObject; Item: TListItem; Selected: Boolean);
+Begin
+  Selected := (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected <> nil;
+  (ObjectActionFrom.FindComponent('ActionControlGroup') as TGroupBox).Enabled := Selected;
+  if not Selected then exit;
+  if Item.Caption = 'Переместить объект' then (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex := 0
+  else if Item.Caption = 'Переместить игрока' then (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex := 1
+  else if Item.Caption = 'Убить игрока' then (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex := 2
+  else if Item.Caption = 'Изменить спавн' then (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex := 3;
+
+  (ObjectActionFrom.FindComponent('id') as TEdit).Text := (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[0];
+  (ObjectActionFrom.FindComponent('x') as TEdit).Text := (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[1];
+  (ObjectActionFrom.FindComponent('y') as TEdit).Text := (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[2];
+End;
+
+procedure ChangeActonsSelect(Sender: TObject);
+Begin
+  (ObjectActionFrom.FindComponent('id') as TEdit).ReadOnly := (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex <= 1;
+  (ObjectActionFrom.FindComponent('x') as TEdit).ReadOnly := (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex = 2;
+  (ObjectActionFrom.FindComponent('y') as TEdit).ReadOnly := (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).ItemIndex = 2;
+  (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.Caption := (ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).Text;
+End;
+
+procedure ChangeId(Sender: TObject);
+Begin
+  if (ObjectActionFrom.FindComponent('id') as TEdit).Text <> '' then
+    (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[0] := (ObjectActionFrom.FindComponent('id') as TEdit).Text;
+End;
+
+procedure ChangeX(Sender: TObject);
+Begin
+  if (ObjectActionFrom.FindComponent('x') as TEdit).Text <> '' then
+    (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[1] := (ObjectActionFrom.FindComponent('x') as TEdit).Text;
+End;
+
+procedure ChangeY(Sender: TObject);
+Begin
+  if (ObjectActionFrom.FindComponent('y') as TEdit).Text <> '' then
+    (ObjectActionFrom.FindComponent('ActionsList') as TListView).Selected.SubItems[2] := (ObjectActionFrom.FindComponent('y') as TEdit).Text;
+End;
+
+procedure ObjectActionFromClose(Sender: TObject; var CanClose: Boolean);
+Begin
+  obj.activate := 0;
 End;
 
 function TForm1.CheckSaveMap:boolean;
@@ -394,22 +574,6 @@ Begin
     end;
   result := true;
 End;
-
-procedure TForm1.Button2Click(Sender: TObject);
-var
-  F: File of TMap;
-  Sv: TMap;
-begin
-  Reset(F);
-  SetLength(save.objs,0);
-  while not Eof(F) do
-  Begin
-    Read(F,Sv);
-    SetLength(save.objs,Length(save.objs)+1);
-    save.objs[High(save.objs)] := Sv;
-  End;
-  ShowMessage(IntToStr(Length(save.objs)));
-end;
 
 procedure backalign(Sender: TWinControl; Control: TControl;
   var NewLeft, NewTop, NewWidth, NewHeight: Integer; var AlignRect: TRect;
@@ -449,12 +613,12 @@ end;
 procedure TForm1.Remove(i: Word);
 Begin
   obj.arr[i].img.Free;
-  if i < High(obj.arr) then for i := i to High(obj.arr)-1 do
+  if i < obj.high then for i := i to obj.high-1 do
   Begin
     obj.arr[i] := obj.arr[i+1];
     obj.arr[i].img.Tag := i;
   End;
-  SetLength(obj.arr, Length(obj.arr)-1);
+  dec(obj.high);
 End;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -463,17 +627,52 @@ var
   animbit: TBitMap;
   test: TImage;
   i: Word;
+  x,y: Word;
   Stngs: ^TSettings;
   bkg: TJPEGImage;
 
 begin
-  FormPanel := TForm.Create(Form1);
-  FormPanel.Parent := Form1;
-  //FormPanel.Visible := false;
-  FormPanel.ClientWidth := 0;
-  FormPanel.ClientHeight := 0;
-  FormPanel.BorderStyle := bsToolWindow;
-  FormPanel.Show;
+  obj.high := 0;
+
+  RegisterClass(TComboBox);
+  RegisterClass(TGroupBox);
+  RegisterClass(TListView);
+  RegisterClass(TEdit);
+  RegisterClass(TButton);
+  RegisterClass(TMemo);
+  RegisterClass(TLabel);
+
+  ObjectActionFrom := TForm.Create(Form1);
+  LoadDFMtoComponent('forms/ObjectActions.dfm', ObjectActionFrom);
+  ObjectActionFrom.Parent := Form1;
+  @(ObjectActionFrom.FindComponent('apply') as TButton).OnClick := @ApplyObjectActions;
+  @(ObjectActionFrom.FindComponent('create') as TButton).OnClick := @CreateObjectAction;
+  @(ObjectActionFrom.FindComponent('delete') as TButton).OnClick := @DeleteObjectAction;
+  @(ObjectActionFrom.FindComponent('ActionsList') as TListView).OnSelectItem := @SelectObjectAction;
+  @(ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).OnChange := @ChangeActonsSelect;
+  @(ObjectActionFrom.FindComponent('id') as TEdit).OnChange := @ChangeId;
+  @(ObjectActionFrom.FindComponent('x') as TEdit).OnChange := @ChangeX;
+  @(ObjectActionFrom.FindComponent('y') as TEdit).OnChange := @ChangeY;
+  @ObjectActionFrom.OnCloseQuery := @ObjectActionFromClose;
+  ObjectActionFrom.Hide;
+
+  SettingsForm := TForm.Create(Form1);
+  LoadDFMtoComponent('forms/SettingsForm.dfm', SettingsForm);
+
+  ObjectsPanel := TForm.Create(Form1);
+  ObjectsPanel.Parent := Form1;
+  ObjectsPanel.ClientWidth := 0;
+  ObjectsPanel.ClientHeight := 0;
+  ObjectsPanel.BorderStyle := bsToolWindow;
+  ObjectsPanel.Top := 5;
+  ObjectsPanel.Show;
+
+  PlayersPanel := TForm.Create(Form1);
+  PlayersPanel.Parent := Form1;
+  PlayersPanel.ClientWidth := 0;
+  PlayersPanel.ClientHeight := 0;
+  PlayersPanel.BorderStyle := bsToolWindow;
+  PlayersPanel.Show;
 
   bkg := TJPEGImage.Create;
   bkg.LoadFromFile('background.jpg');
@@ -487,54 +686,62 @@ begin
   background.Align := alCustom;
   //background.Visible := false;
 
+  //ClientWidth := 1920;
+  //ClientHeight := 1080;
+
+  {background.Canvas.Pen.Color := clGray;
+  background.Canvas.Pen.Width := 1;
+  background.Canvas.Pen.Style := psDot;
+  for x := 0 to clientwidth div 60 do
+  Begin
+    background.Canvas.MoveTo(x*60, 0);
+    background.Canvas.LineTo(x*60, ClientHeight);
+  End;
+  for y := 0 to ClientHeight div 60 do
+  Begin
+    background.Canvas.MoveTo(0, y*60);
+    background.Canvas.LineTo(ClientWidth, y*60);
+  End; }
+
+  //ClientWidth := 1296;
+  //ClientHeight := 759;
+
   Canvas.Brush.Style := bsClear;
   Canvas.Pen.Color := clBlue;
   Canvas.Pen.Width := 1;
   Canvas.Pen.Style := psDash;
 
   myobj := TObj.Create;
-  manager.LoadALL('mods', nil, myobj, nil, nil, nil);
-  obj.activate := -1;
+  playerslist := TPlayers.Create;
+  manager.LoadALL('mods', nil, myobj, playerslist, nil, nil, nil, nil);
+  obj.activate := 0;
 
-  if myobj.Count > 0 then for i := 0 to myobj.Count - 1 do
+  if myobj.Count > 0 then for i := 1 to myobj.Count do
   Begin
     bit := TBitmap.Create;
     try
-      bit.Assign(myobj.pic[i]);
-      SetLength(img.arr,Length(img.arr)+1);
+      inc(img.high);
 
-      img.arr[i].img := TImage.Create(FormPanel);
-      img.arr[i].img.Parent := FormPanel;
+      img.arr[i].img := TImage.Create(ObjectsPanel);
+      img.arr[i].img.Parent := ObjectsPanel;
       img.arr[i].img.tag := i;
       img.arr[i].img.Anchors := [akLeft,akBottom];
 
-      if i = 0 then img.arr[i].img.Left := 0
+      if i = 1 then img.arr[i].img.Left := 0
       else img.arr[i].img.Left := img.arr[i-1].img.Left + img.arr[i-1].img.Picture.Bitmap.Width;
 
-      if FormPanel.ClientHeight < img.arr[i].img.Height then FormPanel.ClientHeight := img.arr[i].img.Height;
+      if ObjectsPanel.ClientHeight < img.arr[i].img.Height then ObjectsPanel.ClientHeight := img.arr[i].img.Height;
 
 
       img.arr[i].img.Top := 0;
-      img.arr[i].img.Picture.Bitmap := bit;
+      img.arr[i].img.Picture.Assign(myobj.GIF[i-1].Images.First.Image.Bitmap);
 
-      img.arr[i].Name := myobj.Name[i];
+      img.arr[i].Name := myobj.Name[i-1];
 
       img.arr[i].img.Picture.Bitmap.TransparentMode := tmFixed;
-      Stngs := myobj.Settings[i];
+      Stngs := myobj.Settings[i-1];
       img.arr[i].img.Picture.Bitmap.TransparentColor := Stngs.Transparent;
       img.arr[i].img.Transparent := true;
-
-      {if Stngs.animation then
-      Begin
-        test := TImage.Create(form1);
-        test.Parent := form1;
-        test.Canvas.Draw(0,0,myobj.GIF[i].Images.Frames[0].Bitmap);
-        test.Picture.Bitmap.TransparentColor := clBlack;
-        test.Picture.Bitmap.TransparentMode := tmFixed;
-        test.Transparent := true;
-        img.arr[i].img.Canvas.Draw(Stngs.AnimPos.x,Stngs.AnimPos.y,test.Picture.Bitmap);
-        test.Free;
-      End;}
 
       img.arr[i].img.OnMouseDown := md;
       img.arr[i].img.OnMouseUp := mu;
@@ -546,60 +753,46 @@ begin
     end;
   End;
 
-  FormPanel.ClientWidth := img.arr[High(img.arr)].img.Left + img.arr[High(img.arr)].img.Width;
-
-  {myobj := TObj.Create;
-  manager.LoadALL('mods', nil, myobj);
-
-  if myobj.Count > 0 then for i := 0 to myobj.Count - 1 do
+  if playerslist.Count > 0 then for i := 1 to playerslist.Count do
   Begin
     bit := TBitmap.Create;
     try
-      bit.Assign(myobj.pic[i]);
-      SetLength(img.arr,Length(img.arr)+1); 
+      inc(Players.high);
 
-      img.arr[i].img := TImage.Create(Form1);
-      img.arr[i].img.Parent := Form1;   
-      img.arr[i].img.tag := i;
-      img.arr[i].img.Anchors := [akLeft,akBottom];
-      
-      if i = 0 then img.arr[i].img.Left := 0
-      else img.arr[i].img.Left := img.arr[i-1].img.Left + img.arr[i-1].img.Picture.Bitmap.Width;
-      
-      if bit.Height > ClientHeight - line.Top then line.Top := ClientHeight - bit.Height;
+      Players.arr[i].img := TImage.Create(PlayersPanel);
+      Players.arr[i].img.Parent := PlayersPanel;
+      Players.arr[i].img.tag := i;
+      Players.arr[i].img.Anchors := [akLeft,akBottom];
 
-      img.arr[i].img.Top := ClientHeight - bit.Height;
-      img.arr[i].img.Picture.Bitmap := bit;
+      if i = 1 then Players.arr[i].img.Left := 0
+      else Players.arr[i].img.Left := Players.arr[i-1].img.Left + Players.arr[i-1].img.Picture.Bitmap.Width;
 
-      img.arr[i].Name := myobj.Name[i];
+      if PlayersPanel.ClientHeight < Players.arr[i].img.Height then PlayersPanel.ClientHeight := Players.arr[i].img.Height;
 
-      img.arr[i].img.Picture.Bitmap.TransparentMode := tmFixed;
-      Stngs := myobj.Settings[i];
-      img.arr[i].img.Picture.Bitmap.TransparentColor := Stngs.Transparent;
-      img.arr[i].img.Transparent := true;
 
-      {if Stngs.animation then
-      Begin
-        test := TImage.Create(form1);
-        test.Parent := form1;
-        test.Canvas.Draw(0,0,myobj.GIF[i].Images.Frames[0].Bitmap);
-        test.Picture.Bitmap.TransparentColor := clBlack;
-        test.Picture.Bitmap.TransparentMode := tmFixed;
-        test.Transparent := true;
-        img.arr[i].img.Canvas.Draw(Stngs.AnimPos.x,Stngs.AnimPos.y,test.Picture.Bitmap);
-        test.Free;
-      End;
+      Players.arr[i].img.Top := 0;
+      Players.arr[i].img.Picture.Assign(playerslist.Anim[i-1].stand.Images.First.Image.Bitmap);
 
-      img.arr[i].img.OnMouseDown := md;
-      img.arr[i].img.OnMouseUp := mu;
-      img.arr[i].img.OnMouseMove := mv;
+      Players.arr[i].Name := playerslist.Name[i-1];
+
+      Players.arr[i].img.Picture.Bitmap.TransparentMode := tmFixed;
+      Stngs := playerslist.Settings[i-1];
+      Players.arr[i].img.Picture.Bitmap.TransparentColor := Stngs.Transparent;
+      Players.arr[i].img.Transparent := true;
+
+      //Players.arr[i].img.OnMouseDown := md;
+      //Players.arr[i].img.OnMouseUp := mu;
+      //Players.arr[i].img.OnMouseMove := mv;
 
       bit.Free;
     except
 
     end;
-  End; }
+  End;
 
+
+  PlayersPanel.Top := ClientHeight - ObjectsPanel.Height - 20;
+  ObjectsPanel.ClientWidth := img.arr[img.high].img.Left + img.arr[img.high].img.Width;
 end;
 
 procedure TForm1.FormKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -609,8 +802,8 @@ begin
   case Key of
     VK_DELETE:
     Begin
-      i := 0;
-      while High(obj.arr) >= i do
+      i := 1;
+      while obj.high >= i do
       Begin
         if obj.arr[i].selected then
         Begin
@@ -623,9 +816,9 @@ begin
     End;
     ord('I'):
     Begin
-      FormPanel.Visible := not FormPanel.Visible;
-      FormPanel.Left := 0;
-      FormPanel.Top := 0;
+      ObjectsPanel.Visible := not ObjectsPanel.Visible;
+      ObjectsPanel.Left := 0;
+      ObjectsPanel.Top := 0;
     End;
   end;
 end;
@@ -648,7 +841,7 @@ begin
     Repaint;
     Rectangle(select.x, select.y, x, y);
   End;
-  if y <= 20 then N1.Visible := true else N1.Visible := false;
+  if y <= 20*(Ord(not N1.Visible)) then N1.Visible := true else N1.Visible := false;
   //for I := 0 to High(img.arr) do img.arr[i].img.Visible := (y >= line.Top);
 end;
 
@@ -657,8 +850,7 @@ procedure TForm1.FormMouseUp(Sender: TObject; Button: TMouseButton;
 var
   i: Word;
 begin
-
-  if length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
+  if obj.high > 1 then for i := 1 to obj.high do
     if ((obj.arr[i].img.Left >= min(select.x, x)) and
        (obj.arr[i].img.Left <= max(select.x, x)) and
        (obj.arr[i].img.Top >= min(select.y, y)) and
@@ -686,8 +878,8 @@ begin
     if opendialog.Execute then
     Begin
       Timer1.Enabled := false;
-      if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do obj.arr[i].img.Free;
-      SetLength(obj.arr, 0);
+      if obj.high > 1 then for i := 1 to obj.high do obj.arr[i].img.Free;
+      obj.high := 1;
       mapname := opendialog.FileName;
       ApplyName;
       LoadMap;
@@ -708,8 +900,8 @@ begin
   if CheckSaveMap then
   Begin
     SetLength(mapname, 0);
-    if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do obj.arr[i].img.Free;
-    SetLength(obj.arr, 0);
+    if obj.high > 1 then for i := 1 to obj.high do obj.arr[i].img.Free;
+    obj.high := 1;
     mapname := '';
     ApplyName;
     saved := true;
@@ -718,8 +910,12 @@ end;
 
 procedure TForm1.setformclose(Sender: TObject; var CanClose: Boolean);
 Begin
+  if (SettingsForm.FindComponent('width') as TEdit).Text <> '' then Form1.Width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
+  if (SettingsForm.FindComponent('width') as TEdit).Text <> '' then save.settings.width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
+  if (SettingsForm.FindComponent('height') as TEdit).Text <> '' then Form1.Height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
+  if (SettingsForm.FindComponent('height') as TEdit).Text <> '' then save.settings.height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
   Form1.Enabled := true;
-  FormPanel.Enabled := true;
+  ObjectsPanel.Enabled := true;
   CanClose := true;
 end;
 
@@ -728,101 +924,37 @@ var
   i: Word;
   x,y: Word;
 begin
-  Canvas.Pen.Width := 2;
+  {Canvas.Pen.Width := 2;
   Canvas.Pen.Color := clBlue;
 
-  Refresh;
+  Refresh;}
 
-  if Length(obj.arr) > 0 then for i := 0 to High(obj.arr) do
+  {if obj.high > 1 then for i := 1 to obj.high do
   Begin
     if(obj.arr[i].selected) then Canvas.Rectangle(obj.arr[i].img.Left - 1, obj.arr[i].img.Top - 1, obj.arr[i].img.Width + obj.arr[i].img.Left + 2, obj.arr[i].img.Height + obj.arr[i].img.Top + 2);
-    if(obj.arr[i].activate > 0) then
+    if(obj.arr[i].data.id > 0) then
     begin
       Canvas.MoveTo(obj.arr[i].img.Left + obj.arr[i].img.Width div 2, obj.arr[i].img.Top + obj.arr[i].img.Height div 2);
-      Canvas.LineTo(obj.arr[obj.arr[i].activate].img.Left + obj.arr[obj.arr[i].activate].img.Width div 2, obj.arr[obj.arr[i].activate].img.Top + obj.arr[obj.arr[i].activate].img.Height div 2);
+      Canvas.LineTo(obj.arr[obj.arr[i].data.id].img.Left + obj.arr[obj.arr[i].data.id].img.Width div 2, obj.arr[obj.arr[i].data.id].img.Top + obj.arr[obj.arr[i].data.id].img.Height div 2);
     end;
-  End;
+  End; }
 
-  if(obj.activate > 0) then
+  {if(obj.activate > 0) then
   Begin
     Canvas.MoveTo(obj.arr[obj.activate].img.Left + obj.arr[obj.activate].img.Width div 2, obj.arr[obj.activate].img.Top + obj.arr[obj.activate].img.Height div 2);
     Canvas.LineTo(Mouse.CursorPos.X, Mouse.CursorPos.Y);
-  End;
-
+  End; }
+  {
   Canvas.Pen.Style := psDash;
-  Canvas.Pen.Color := clBlue;
+  Canvas.Pen.Color := clBlue; }
 end;
-
-procedure TForm1.SaveBtn(Sender: TObject);
-Begin
-  if Settings.width.Text <> '' then Form1.Width := StrToInt(Settings.width.Text);
-  if Settings.width.Text <> '' then save.settings.width := StrToInt(Settings.width.Text);
-  if Settings.height.Text <> '' then Form1.Height := StrToInt(Settings.height.Text);
-  if Settings.height.Text <> '' then save.settings.height := StrToInt(Settings.height.Text);
-  if settings.players.Text <> '' then save.settings.players := StrToInt(settings.players.Text);
-  if settings.start.x.Text <> '' then save.settings.start[0].x := StrToInt(settings.start.x.Text);
-  if settings.start.y.Text <> '' then save.settings.start[0].y := StrToInt(settings.start.y.Text);
-End;
 
 procedure TForm1.N5Click(Sender: TObject);
 begin
-  Form2 := TForm.Create(Form1);
-  Form2.Parent := nil;
-  settings.width := TEdit.Create(Form2);
-  settings.height := TEdit.Create(Form2);
-  settings.players := TEdit.Create(Form2);
-  settings.start.x := TEdit.Create(Form2);
-  settings.start.y := TEdit.Create(Form2);
-  settings.savebtn := TButton.Create(Form2);
-  settings.widthlabel := TLabel.Create(Form2);
-  settings.heightlabel := TLabel.Create(Form2);
-  settings.playerslabel := TLabel.Create(Form2);
-  settings.startxlabel := TLabel.Create(Form2);
-  settings.startylabel := TLabel.Create(Form2);
-  settings.width.Parent := Form2;
-  settings.height.Parent := Form2;
-  settings.start.x.Parent := Form2;
-  settings.start.y.Parent := Form2;
-  settings.players.Parent := Form2;
-  settings.savebtn.Parent := Form2;
-  settings.widthlabel.Parent := Form2;
-  settings.heightlabel.Parent := Form2;
-  settings.playerslabel.Parent := Form2;
-  settings.startxlabel.Parent := Form2;
-  settings.startylabel.Parent := Form2;
-  settings.width.Left := 34;
-  settings.height.Left := settings.width.Left + settings.width.Width + 40;
-  settings.start.x.Left := 34;
-  settings.start.y.Left := settings.start.x.Left + settings.start.x.Width + 40;
-  settings.players.Left := 34;
-  settings.players.Top := settings.width.Height + 6;
-  settings.start.x.Top := settings.players.Top + settings.players.Height + 6;
-  settings.start.y.Top := settings.players.Top + settings.players.Height + 6;
-  settings.savebtn.Top := settings.start.x.Top + settings.start.x.Height + 6;
-  settings.playerslabel.Top := settings.players.Top;
-  settings.startxlabel.Top := settings.start.x.Top;
-  settings.startylabel.Top := settings.start.y.Top;
-  settings.startylabel.Left := settings.start.x.Left + settings.start.x.Width + 3;
-  settings.widthlabel.Left := settings.width.Left + settings.width.Width + 3;
-  settings.savebtn.OnClick := SaveBtn;
-  settings.savebtn.Left := 34;
-  settings.widthlabel.Caption := 'width:';
-  settings.heightlabel.Caption := 'height:';
-  settings.playerslabel.Caption := 'players:';
-  settings.startxlabel.Caption := 'start x:';
-  settings.startylabel.Caption := 'start y:';
-  settings.savebtn.Caption := 'SAVE';
-  settings.width.Text := IntToStr(Form1.Width);
-  settings.height.Text := IntToStr(Form1.Height);
-  settings.players.Text := IntToStr(save.settings.players);
-  settings.start.x.Text := IntToStr(save.settings.start[0].x);
-  settings.start.y.Text := IntToStr(save.settings.start[0].y);
-  Form2.BorderIcons := [biSystemMenu,biMinimize];
-  Form2.BorderStyle := bsSingle;
-  Form2.Show;
-  Form2.OnCloseQuery := setformclose;
+  SettingsForm.Show;
+  SettingsForm.OnCloseQuery := setformclose;
   Form1.Enabled := false;
-  FormPanel.Enabled := false;
+  ObjectsPanel.Enabled := false;
 end;
 
 procedure TForm1.N6Click(Sender: TObject);
