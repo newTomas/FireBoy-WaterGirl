@@ -111,10 +111,6 @@ type
       width, height: Word;
     end;
     players: Byte;
-    PlayerType: array of record
-      x,y: Word; //Стартовые координаты
-      name: string[32]; //Название персонажа
-    end;
   end;
   TMap = record
     x, y: Word;

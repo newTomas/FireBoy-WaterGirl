@@ -24,15 +24,9 @@ object Form1: TForm1
   OnMouseDown = FormMouseDown
   OnMouseMove = FormMouseMove
   OnMouseUp = FormMouseUp
+  OnPaint = FormPaint
   PixelsPerInch = 96
   TextHeight = 13
-  object background: TImage
-    Left = 0
-    Top = 0
-    Width = 105
-    Height = 105
-    Enabled = False
-  end
   object MainMenu1: TMainMenu
     AutoHotkeys = maManual
     Left = 1032
@@ -67,6 +61,7 @@ object Form1: TForm1
     end
   end
   object Timer1: TTimer
+    Enabled = False
     Interval = 100
     OnTimer = Timer1Timer
     Left = 928
