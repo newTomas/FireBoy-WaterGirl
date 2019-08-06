@@ -107,9 +107,6 @@ type
   end;
   TSettingsMap = record
     width, height: Word;
-    background: record
-      width, height: Word;
-    end;
     players: Byte;
   end;
   TMap = record

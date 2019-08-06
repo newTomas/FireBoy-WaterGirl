@@ -35,13 +35,11 @@ type
     procedure RemoveObj(i: Word);
     procedure RemovePlayer(i: Word);
 
-    procedure ov(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
+    procedure ObjectMouseMove(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
     procedure od(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
-    procedure ou(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
+    procedure ObjectMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
 
-    procedure PlayersMouseMove(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
     procedure PlayersMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
-    procedure PlayersMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
 
     procedure PlayerslistMouseMove(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
     procedure PlayerslistMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
@@ -119,8 +117,8 @@ var
   PlayersObjs: record
     high: Word;
     activate: Word;
-    x,y: Word;
     down: boolean;
+    x,y: Word;
     moved: boolean;
     arr: array[1..255] of record
       img: TImage;
@@ -158,8 +156,10 @@ procedure deselect;
 var
   i: Word;
 Begin
-  for i := 0 to obj.high do
+  for i := 1 to obj.high do
     obj.arr[i].selected := false;
+  for i := 1 to PlayersObjs.high do
+    PlayersObjs.arr[i].selected := false;
 End;
 
 procedure TForm1.ApplyName;
@@ -170,16 +170,24 @@ Begin
     Caption := mapname + ' - ' + gamename;
 End;
 
-procedure TForm1.ov(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
+procedure TForm1.ObjectMouseMove(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
 var
   i: Word;
 begin
-  if obj.down then
+  if obj.down or PlayersObjs.down then
   Begin
-    obj.arr[(Sender as TImage).Tag].img.Hint := IntToStr((Sender as TImage).Left)+' '+IntToStr((Sender as TImage).Top);
-    obj.arr[(Sender as TImage).Tag].img.ShowHint := true;
-    obj.moved := true;
-    if (obj.x/obj.Width >= 0.8) and (obj.y/obj.Height >= 0.8) then
+    if obj.down then
+    Begin
+      obj.arr[(Sender as TImage).Tag].img.Hint := IntToStr((Sender as TImage).Left)+' '+IntToStr((Sender as TImage).Top);
+      obj.arr[(Sender as TImage).Tag].img.ShowHint := true;
+      obj.moved := true;
+    end else
+    Begin
+      PlayersObjs.arr[(Sender as TImage).Tag].img.Hint := IntToStr((Sender as TImage).Left)+' '+IntToStr((Sender as TImage).Top);
+      PlayersObjs.arr[(Sender as TImage).Tag].img.ShowHint := true;
+      PlayersObjs.moved := true;
+    end;
+    if obj.down and (obj.x/obj.Width >= 0.8) and (obj.y/obj.Height >= 0.8) then
     Begin
       Screen.Cursor := crSizeNWSE;
       obj.arr[(Sender as TImage).Tag].Width := obj.Width + x - obj.x;
@@ -189,23 +197,39 @@ begin
     End else
     Begin
       Screen.Cursor := crSizeAll;
-      if obj.arr[(Sender as TImage).Tag].selected then
-      Begin
-        if obj.high >= 1 then for i := 1 to obj.high do if obj.arr[i].selected then
-          if ssShift in Shift then
-          Begin
-            obj.arr[i].img.Left := RoundUp(obj.arr[i].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
-            obj.arr[i].img.Top := RoundUp(obj.arr[i].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
-          End else
-          Begin
-            obj.arr[i].img.Left := obj.arr[i].img.Left + x - obj.x;
-            obj.arr[i].img.Top := obj.arr[i].img.Top + y - obj.y;
-          End;
-      End else
-      Begin
-        deselect;
-        obj.arr[(Sender as TImage).Tag].selected := true;
-      End;
+      if obj.down then
+        if not obj.arr[(Sender as TImage).Tag].selected then
+        Begin
+          deselect;
+          obj.arr[(Sender as TImage).Tag].selected := true;
+        End
+    else else if not PlayersObjs.arr[(Sender as TImage).Tag].selected then
+        Begin
+          deselect;
+          PlayersObjs.arr[(Sender as TImage).Tag].selected := true;
+        End;
+
+      if obj.high >= 1 then for i := 1 to obj.high do if obj.arr[i].selected then
+        if ssShift in Shift then
+        Begin
+          obj.arr[i].img.Left := RoundUp(obj.arr[i].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+          obj.arr[i].img.Top := RoundUp(obj.arr[i].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+        End else
+        Begin
+          obj.arr[i].img.Left := obj.arr[i].img.Left + x - obj.x;
+          obj.arr[i].img.Top := obj.arr[i].img.Top + y - obj.y;
+        End;
+
+      if PlayersObjs.high >= 1 then for i := 1 to PlayersObjs.high do if PlayersObjs.arr[i].selected then
+        if ssShift in Shift then
+        Begin
+          PlayersObjs.arr[i].img.Left := RoundUp(PlayersObjs.arr[i].img.Left + x - obj.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+          PlayersObjs.arr[i].img.Top := RoundUp(PlayersObjs.arr[i].img.Top + y - obj.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
+        End else
+        Begin
+          PlayersObjs.arr[i].img.Left := PlayersObjs.arr[i].img.Left + x - obj.x;
+          PlayersObjs.arr[i].img.Top := PlayersObjs.arr[i].img.Top + y - obj.y;
+        End;
     End;
     Form1.Repaint;
   End;
@@ -238,8 +262,10 @@ Begin
     End;
   End else
   Begin
-    if obj.activate > 0 then (ObjectActionFrom.FindComponent('id') as TEdit).Text := IntToStr((Sender as TImage).Tag) else
-    Begin
+    if obj.activate > 0 then
+      if ((ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).Text = 'Переместить объект') then
+        (ObjectActionFrom.FindComponent('id') as TEdit).Text := IntToStr((Sender as TImage).Tag)
+    else else Begin
       obj.x := x;
       obj.y := y;
       obj.Width := (Sender as TImage).Width;
@@ -251,21 +277,26 @@ Begin
   End;
 End;
 
-procedure TForm1.ou(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
+procedure TForm1.ObjectMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer);
 var
   selected: Word;
   i: Word;
 Begin
   selected := 0;
   Screen.Cursor := crArrow;
-  obj.down := false;
   if not (ssCtrl in Shift) and (not obj.moved) then deselect;
-  if not obj.moved then obj.arr[(Sender as TImage).Tag].selected := true;
+  if PlayersObjs.down and (not obj.moved) then PlayersObjs.arr[(Sender as TImage).Tag].selected := true;
+  if obj.down and (not obj.moved) then obj.arr[(Sender as TImage).Tag].selected := true;
   if obj.moved then
   Begin
     for i := 1 to obj.high do if obj.arr[i].selected then inc(selected);
-    if selected = 1 then obj.arr[(Sender as TImage).Tag].selected := False;
+    for i := 1 to PlayersObjs.high do if PlayersObjs.arr[i].selected then inc(selected);
+    if selected = 1 then if obj.down then obj.arr[(Sender as TImage).Tag].selected := False
+                         else PlayersObjs.arr[(Sender as TImage).Tag].selected := False;
   End;
+
+  obj.down := false;
+  PlayersObjs.down := false;
 
   Form1.Repaint;
 End;
@@ -321,8 +352,8 @@ Begin
     PlayersObjs.arr[PlayersObjs.high].img.Transparent := true;
 
     PlayersObjs.arr[PlayersObjs.high].img.OnMouseDown := PlayersMouseDown;
-    PlayersObjs.arr[PlayersObjs.high].img.OnMouseUp := PlayersMouseUp;
-    PlayersObjs.arr[PlayersObjs.high].img.OnMouseMove := PlayersMouseMove;
+    PlayersObjs.arr[PlayersObjs.high].img.OnMouseUp := ObjectMouseUp;
+    PlayersObjs.arr[PlayersObjs.high].img.OnMouseMove := ObjectMouseMove;
 
     Players.arr[(Sender as TImage).Tag].img.Free;
 
@@ -346,68 +377,15 @@ End;
 procedure TForm1.PlayersMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if obj.activate > 0 then (ObjectActionFrom.FindComponent('id') as TEdit).Text := IntToStr((Sender as TImage).Tag) else
-  Begin
-    PlayersObjs.x := x;
-    PlayersObjs.y := y;
+  if obj.activate > 0 then
+    if ((ObjectActionFrom.FindComponent('ActionsSelect') as TComboBox).Text <> 'Переместить объект') then
+      (ObjectActionFrom.FindComponent('id') as TEdit).Text := IntToStr((Sender as TImage).Tag)
+  else else Begin
+    obj.x := x;
+    obj.y := y;
     PlayersObjs.down := true;
-    PlayersObjs.moved := false;
     saved := false;
   End;
-end;
-
-procedure TForm1.PlayersMouseMove(Sender: TObject; Shift: TShiftState; X,
-  Y: Integer);
-var
-  i: Word;
-begin
-  if PlayersObjs.down then
-  Begin
-    PlayersObjs.arr[(Sender as TImage).Tag].img.Hint := IntToStr((Sender as TImage).Left)+' '+IntToStr((Sender as TImage).Top);
-    PlayersObjs.arr[(Sender as TImage).Tag].img.ShowHint := true;
-    PlayersObjs.moved := true;
-
-    Screen.Cursor := crSizeAll;
-    if PlayersObjs.arr[(Sender as TImage).Tag].selected then
-    Begin
-      if PlayersObjs.high >= 1 then for i := 1 to PlayersObjs.high do if PlayersObjs.arr[i].selected then
-        if ssShift in Shift then
-        Begin
-          PlayersObjs.arr[i].img.Left := RoundUp(PlayersObjs.arr[i].img.Left + x - PlayersObjs.x, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
-          PlayersObjs.arr[i].img.Top := RoundUp(PlayersObjs.arr[i].img.Top + y - PlayersObjs.y, 1 + ord(ssShift in Shift)*4 + ord(ssCtrl in Shift) + ord((ssShift in Shift) and (ssCtrl in Shift))*4);
-        End else
-        Begin
-          PlayersObjs.arr[i].img.Left := PlayersObjs.arr[i].img.Left + x - PlayersObjs.x;
-          PlayersObjs.arr[i].img.Top := PlayersObjs.arr[i].img.Top + y - PlayersObjs.y;
-        End;
-    End else
-    Begin
-      deselect;
-      PlayersObjs.arr[(Sender as TImage).Tag].selected := true;
-    End;
-
-    Form1.Repaint;
-  End;
-end;
-
-procedure TForm1.PlayersMouseUp(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  selected: Word;
-  i: Word;
-begin
-  selected := 0;
-  Screen.Cursor := crArrow;
-  PlayersObjs.down := false;
-  if not (ssCtrl in Shift) and (not PlayersObjs.moved) then deselect;
-  if not PlayersObjs.moved then PlayersObjs.arr[(Sender as TImage).Tag].selected := true;
-  if PlayersObjs.moved then
-  Begin
-    for i := 1 to PlayersObjs.high do if PlayersObjs.arr[i].selected then inc(selected);
-    if selected = 1 then PlayersObjs.arr[(Sender as TImage).Tag].selected := False;
-  End;
-
-  Form1.Repaint;
 end;
 
 procedure TForm1.mv(Sender: TObject; Shift: TShiftState; X: Integer; Y: Integer);
@@ -465,8 +443,8 @@ Begin
     obj.arr[obj.high].img.Transparent := true;
 
     obj.arr[obj.high].img.OnMouseDown := od;
-    obj.arr[obj.high].img.OnMouseUp := ou;
-    obj.arr[obj.high].img.OnMouseMove := ov;
+    obj.arr[obj.high].img.OnMouseUp := ObjectMouseUp;
+    obj.arr[obj.high].img.OnMouseMove := ObjectMouseMove;
   end;
   (Sender as TImage).Top := 0;
   if (Sender as TImage).tag = 1 then (Sender as TImage).Left := 0
@@ -477,21 +455,64 @@ End;
 function TForm1.LoadMap: boolean;
 var
   i, j, k: Word;
-  json: TJSONArray;
+  json: TJSONObject;
+  jsonObjects: TJSONArray;
+  jsonPlayers: TJSONArray;
   jsonobj: TJSONObject;
   jsondataarr: TJSONArray;
   jsondata: TJSONObject;
 begin
   obj.high := 0;
-  json := TJSONObject.ParseJSONValue(TFile.ReadAllText(mapname)) as TJSONArray;
-  if json.Count > 0 then for i := 0 to json.Count - 1 do
+  json := TJSONObject.ParseJSONValue(TFile.ReadAllText(mapname)) as TJSONObject;
+  if (json.FindValue('Players') as TJSONArray).Count > 0 then for i := 0 to (json.FindValue('Players') as TJSONArray).Count-1 do
+  Begin
+    inc(PlayersObjs.high);
+    for j := 1 to Players.high do if (json.FindValue('Players') as TJSONArray).Items[i].FindValue('name').Value = Players.arr[j].name then
+    Begin
+      PlayersObjs.arr[PlayersObjs.high].name := Players.arr[j].name;
+      PlayersObjs.arr[PlayersObjs.high].img := TImage.Create(Form1);
+      PlayersObjs.arr[PlayersObjs.high].img.Parent := Form1;
+      PlayersObjs.arr[PlayersObjs.high].img.Picture.Bitmap := Players.arr[j].img.Picture.Bitmap;
+      PlayersObjs.arr[PlayersObjs.high].img.Left := StrToInt((json.FindValue('Players') as TJSONArray).Items[i].FindValue('x').Value);
+      PlayersObjs.arr[PlayersObjs.high].img.Top := StrToInt((json.FindValue('Players') as TJSONArray).Items[i].FindValue('y').Value);
+      PlayersObjs.arr[PlayersObjs.high].img.Width := PlayersObjs.arr[PlayersObjs.high].img.Picture.Bitmap.Width;
+      PlayersObjs.arr[PlayersObjs.high].img.Height := PlayersObjs.arr[PlayersObjs.high].img.Picture.Bitmap.Height;
+
+      PlayersObjs.arr[PlayersObjs.high].img.tag := PlayersObjs.high;
+
+      PlayersObjs.arr[PlayersObjs.high].img.Picture.Bitmap.TransparentMode := tmFixed;
+      PlayersObjs.arr[PlayersObjs.high].img.Picture.Bitmap.TransparentColor := Players.arr[j].img.Picture.Bitmap.TransparentColor;
+      PlayersObjs.arr[PlayersObjs.high].img.Transparent := true;
+
+      PlayersObjs.arr[PlayersObjs.high].img.OnMouseDown := PlayersMouseDown;
+      PlayersObjs.arr[PlayersObjs.high].img.OnMouseUp := ObjectMouseUp;
+      PlayersObjs.arr[PlayersObjs.high].img.OnMouseMove := ObjectMouseMove;
+
+      Players.arr[Players.arr[j].img.Tag].img.Free;
+
+      if Players.high > Players.arr[j].img.Tag then for k := Players.arr[j].img.Tag to Players.high-1 do
+      Begin
+        Players.arr[k] := Players.arr[k+1];
+        Players.arr[k].img.Tag := k;
+      End;
+
+      dec(Players.high);
+    End;
+    if PlayersObjs.arr[PlayersObjs.high].name = '' then
+    Begin
+      ShowMessage('DLL '+(json.FindValue('Objects') as TJSONArray).Items[i].FindValue('name').Value+'.dll not found.');
+      dec(obj.high);
+    End;
+  End;
+
+  if (json.FindValue('Objects') as TJSONArray).Count > 0 then for i := 0 to (json.FindValue('Objects') as TJSONArray).Count-1 do
   Begin
     inc(obj.high);
-    if img.high > 0 then for j := 1 to img.high do if img.arr[j].name = json.Items[i].FindValue('name').Value then
+    if img.high > 0 then for j := 1 to img.high do if img.arr[j].name = (json.FindValue('Objects') as TJSONArray).Items[i].FindValue('name').Value then
     Begin
-      obj.arr[obj.high].width := StrToInt(json.Items[i].FindValue('width').Value);
-      obj.arr[obj.high].height := StrToInt(json.Items[i].FindValue('height').Value);
-      obj.arr[obj.high].name := json.Items[i].FindValue('name').Value;
+      obj.arr[obj.high].width := StrToInt((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('width').Value);
+      obj.arr[obj.high].height := StrToInt((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('height').Value);
+      obj.arr[obj.high].name := (json.FindValue('Objects') as TJSONArray).Items[i].FindValue('name').Value;
       obj.arr[obj.high].img := TImage.Create(Form1);
       obj.arr[obj.high].img.Parent := Form1;
       Obj.arr[obj.high].img.Tag := obj.high;
@@ -503,36 +524,36 @@ begin
       obj.arr[obj.high].img.Picture.Bitmap.TransparentMode := tmFixed;
       obj.arr[obj.high].img.Picture.Bitmap.TransparentColor := img.arr[j].img.Picture.Bitmap.TransparentColor;
       obj.arr[obj.high].img.Transparent := true;
-      Obj.arr[obj.high].img.Left := StrToInt(json.Items[i].FindValue('x').Value);
-      Obj.arr[obj.high].img.Top := StrToInt(json.Items[i].FindValue('y').Value);
+      Obj.arr[obj.high].img.Left := StrToInt((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('x').Value);
+      Obj.arr[obj.high].img.Top := StrToInt((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('y').Value);
 
       Obj.arr[obj.high].img.OnMouseDown := od;
-      Obj.arr[obj.high].img.OnMouseUp := ou;
-      Obj.arr[obj.high].img.OnMouseMove := ov;
+      Obj.arr[obj.high].img.OnMouseUp := ObjectMouseUp;
+      Obj.arr[obj.high].img.OnMouseMove := ObjectMouseMove;
 
-      SetLength(obj.arr[obj.high].data, (json.Items[i].FindValue('data') as TJSONArray).Count);
+      SetLength(obj.arr[obj.high].data, ((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('data') as TJSONArray).Count);
 
       if Length(obj.arr[obj.high].data) > 0 then for k := 0 to High(obj.arr[obj.high].data) do
       Begin
-        obj.arr[obj.high].data[k].ActionType := TObjectActions(StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('ActionType').Value));
-        obj.arr[obj.high].data[k].id := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('id').Value);
-        obj.arr[obj.high].data[k].coords.X := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('x').Value);
-        obj.arr[obj.high].data[k].coords.Y := StrToInt((json.Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('y').Value);
+        obj.arr[obj.high].data[k].ActionType := TObjectActions(StrToInt(((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('ActionType').Value));
+        obj.arr[obj.high].data[k].id := StrToInt(((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('id').Value);
+        obj.arr[obj.high].data[k].coords.X := StrToInt(((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('x').Value);
+        obj.arr[obj.high].data[k].coords.Y := StrToInt(((json.FindValue('Objects') as TJSONArray).Items[i].FindValue('data') as TJSONArray).Items[k].FindValue('y').Value);
       End;
 
       break;
     End;
     if Obj.arr[obj.high].name = '' then
     Begin
-      ShowMessage('DLL '+json.Items[i].FindValue('name').Value+'.dll not found.');
+      ShowMessage('DLL '+(json.FindValue('Objects') as TJSONArray).Items[i].FindValue('name').Value+'.dll not found.');
       dec(obj.high);
     End;
   End;
 
-  {while not Eof(F2) do
+  {while not Eof(F) do
   Begin
     inc(save.high);
-    Read(F2,save.objs[save.high]);
+    Read(F,save.objs[save.high]);
     inc(obj.high);
     obj.arr[obj.high].width := save.objs[obj.high].width;
     obj.arr[obj.high].height := save.objs[obj.high].height;
@@ -571,11 +592,13 @@ begin
     End;
   End; }
 
-  {AssignFile(F1, mapname+'.settings');
-  Reset(F1);
-  Read(F1,save.settings);
-  Width := save.settings.width;
-  Height := save.settings.height; }
+  AssignFile(F, mapname+'.settings');
+  Reset(F);
+  Read(F,save.settings);
+  ClientWidth := save.settings.width;
+  ClientHeight := save.settings.height;
+  (SettingsForm.FindComponent('width') as TEdit).Text := IntToStr(ClientWidth);
+  (SettingsForm.FindComponent('height') as TEdit).Text := IntToStr(ClientHeight);
   result := true;
 End;
 
@@ -583,7 +606,9 @@ function TForm1.SaveMap:boolean;
 var
   i, j: Word;
   SaveDialog: TSaveDialog;
-  json: TJSONArray;
+  json: TJSONObject;
+  jsonObjects: TJSONArray;
+  jsonPlayers: TJSONArray;
   jsonobj: TJSONObject;
   jsondataarr: TJSONArray;
   jsondata: TJSONObject;
@@ -598,15 +623,26 @@ Begin
     Caption := mapname + ' - ' + gamename;
     AssignFile(F, mapname+'.settings');
     Rewrite(F);
+    save.settings.players := Players.high;
     Write(F, save.settings);
     CloseFile(F);
 
-    json := TJSONArray.Create;
-
-    if obj.high > 1 then for i := 1 to obj.high do
+    jsonPlayers := TJSONArray.Create;
+    if PlayersObjs.high >= 1 then for i := 1 to PlayersObjs.high do
     Begin
-      json.AddElement(TJSONObject.Create);
-      jsonobj := json.Items[pred(json.Count)] as TJSONObject;
+      jsonPlayers.AddElement(TJSONObject.Create);
+      jsonobj := jsonPlayers.Items[pred(jsonPlayers.Count)] as TJSONObject;
+
+      jsonobj.AddPair('x', TJSONNumber.Create(PlayersObjs.arr[i].img.Left))
+        .AddPair('y', TJSONNumber.Create(PlayersObjs.arr[i].img.Top))
+        .AddPair('name', PlayersObjs.arr[i].name);
+    End;
+
+    jsonObjects := TJSONArray.Create;
+    if obj.high >= 1 then for i := 1 to obj.high do
+    Begin
+      jsonObjects.AddElement(TJSONObject.Create);
+      jsonobj := jsonObjects.Items[pred(jsonObjects.Count)] as TJSONObject;
 
       jsondataarr := TJSONArray.Create;
       if Length(obj.arr[i].data) > 0 then
@@ -630,6 +666,10 @@ Begin
         .AddPair('name', obj.arr[i].name)
         .AddPair('data', jsondataarr);
     End;
+
+    json := TJSONObject.Create;
+    json.AddPair('Players', jsonPlayers)
+      .AddPair('Objects', jsonObjects);
 
     TFile.WriteAllText(mapname, json.Format(2));
 
@@ -960,6 +1000,10 @@ begin
     end;
   End;
 
+  save.settings.width := ClientWidth;
+  save.settings.height := ClientHeight;
+  (SettingsForm.FindComponent('width') as TEdit).Text := IntToStr(ClientWidth);
+  (SettingsForm.FindComponent('height') as TEdit).Text := IntToStr(ClientHeight);
 
   PlayersPanel.Top := ClientHeight - ObjectsPanel.Height - 20;
   ObjectsPanel.ClientWidth := img.arr[img.high].img.Left + img.arr[img.high].img.Width;
@@ -1036,7 +1080,7 @@ procedure TForm1.FormMouseUp(Sender: TObject; Button: TMouseButton;
 var
   i: Word;
 begin
-  if obj.high > 1 then for i := 1 to obj.high do
+  if obj.high >= 1 then for i := 1 to obj.high do
     if ((obj.arr[i].img.Left >= min(select.x, x)) and
        (obj.arr[i].img.Left <= max(select.x, x)) and
        (obj.arr[i].img.Top >= min(select.y, y)) and
@@ -1046,6 +1090,17 @@ begin
        (obj.arr[i].img.Top + obj.arr[i].img.Height >= min(select.y, y)) and
        (obj.arr[i].img.Top + obj.arr[i].img.Height <= max(select.y, y))) then obj.arr[i].selected := true
     else obj.arr[i].selected := false;
+
+  if PlayersObjs.high >= 1 then for i := 1 to PlayersObjs.high do
+    if ((PlayersObjs.arr[i].img.Left >= min(select.x, x)) and
+       (PlayersObjs.arr[i].img.Left <= max(select.x, x)) and
+       (PlayersObjs.arr[i].img.Top >= min(select.y, y)) and
+       (PlayersObjs.arr[i].img.Top <= max(select.y, y))) or
+       ((PlayersObjs.arr[i].img.Left + PlayersObjs.arr[i].img.Width >= min(select.x, x)) and
+       (PlayersObjs.arr[i].img.Left + PlayersObjs.arr[i].img.Width <= max(select.x, x)) and
+       (PlayersObjs.arr[i].img.Top + PlayersObjs.arr[i].img.Height >= min(select.y, y)) and
+       (PlayersObjs.arr[i].img.Top + PlayersObjs.arr[i].img.Height <= max(select.y, y))) then PlayersObjs.arr[i].selected := true
+    else PlayersObjs.arr[i].selected := false;
 
   select.selecting := false;
   Form1.Repaint;
@@ -1098,7 +1153,7 @@ begin
       mapname := opendialog.FileName;
       ApplyName;
       LoadMap;
-      Timer1.Enabled := true;
+      //Timer1.Enabled := true;
     End;
   End;
 end;
@@ -1125,10 +1180,16 @@ end;
 
 procedure TForm1.setformclose(Sender: TObject; var CanClose: Boolean);
 Begin
-  if (SettingsForm.FindComponent('width') as TEdit).Text <> '' then Form1.Width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
-  if (SettingsForm.FindComponent('width') as TEdit).Text <> '' then save.settings.width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
-  if (SettingsForm.FindComponent('height') as TEdit).Text <> '' then Form1.Height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
-  if (SettingsForm.FindComponent('height') as TEdit).Text <> '' then save.settings.height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
+  if (SettingsForm.FindComponent('width') as TEdit).Text <> '' then
+  Begin
+    Form1.Width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
+    save.settings.width := StrToInt((SettingsForm.FindComponent('width') as TEdit).Text);
+  End;
+  if (SettingsForm.FindComponent('height') as TEdit).Text <> '' then
+  Begin
+    Form1.Height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
+    save.settings.height := StrToInt((SettingsForm.FindComponent('height') as TEdit).Text);
+  End;
   Form1.Enabled := true;
   ObjectsPanel.Enabled := true;
   CanClose := true;
